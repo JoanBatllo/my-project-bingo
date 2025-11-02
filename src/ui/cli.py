@@ -34,6 +34,28 @@ def ask_int(prompt: str, default: Optional[int] = None, valid: Optional[Set[int]
             continue
         return val
 
+def ask_yes_no(prompt: str, *, default: bool = False) -> bool:
+    hint = "Y/n" if default else "y/N"
+    while True:
+        raw = input(f"{prompt} [{hint}]: ").strip().lower()
+        if raw == "":
+            return default
+        if raw in {"y", "yes"}:
+            return True
+        if raw in {"n", "no"}:
+            return False
+        print("Please answer with 'y' or 'n'.")
+
+def ask_optional_int(prompt: str) -> Optional[int]:
+    while True:
+        raw = input(prompt).strip()
+        if raw == "":
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            print("Please enter a valid integer or leave blank.")
+
 def help_menu() -> None:
     print(
         "\nCommands:\n"
@@ -51,10 +73,36 @@ def main() -> None:
     print(color("\n=== Terminal Bingo MVP ===\n", "bold"))
     n = ask_int("Choose board size N (3/4/5) [default 5]: ", default=5, valid={3,4,5})
     default_pool = {5: 75, 4: 60, 3: 30}[n]
-    pool_max = ask_int(f"Max number in pool [default {default_pool}]: ", default=default_pool)
+    min_pool = n * n
+    while True:
+        pool_max = ask_int(
+            f"Max number in pool [default {default_pool}]: ",
+            default=default_pool,
+        )
+        if pool_max < min_pool:
+            print(f"Pool must be at least {min_pool} to fill a {n}x{n} card.")
+            continue
+        break
 
-    card = BingoCard(n=n, pool_max=pool_max)
-    drawer = NumberDrawer(pool_max=pool_max)
+    free_center = False
+    if n % 2 == 1:
+        free_center = ask_yes_no("Use a free center slot?", default=True)
+    seed = ask_optional_int("Enter RNG seed for reproducible randomness (leave blank for random): ")
+
+    config = {
+        "n": n,
+        "pool_max": pool_max,
+        "free_center": free_center,
+        "seed": seed,
+    }
+
+    card = BingoCard(
+        n=n,
+        pool_max=pool_max,
+        free_center=free_center,
+        seed=seed,
+    )
+    drawer = NumberDrawer(pool_max=pool_max, seed=seed)
 
     help_menu()
     print(card.render(color_fn=color))
@@ -80,11 +128,17 @@ def main() -> None:
         elif cmd == "I":
             recent = ", ".join(map(str, drawer.drawn[-10:])) if drawer.drawn else "—"
             print("\n" + f"Board: {n}x{n} | Pool: 1..{pool_max}\n"
+                        f"Free center: {'on' if config['free_center'] else 'off'} | Seed: {config['seed'] if config['seed'] is not None else 'random'}\n"
                         f"Numbers drawn ({len(drawer.drawn)}): {recent}\n"
                         f"Remaining in pool: {drawer.remaining()}")
         elif cmd == "R":
-            card = BingoCard(n=n, pool_max=pool_max)
-            drawer = NumberDrawer(pool_max=pool_max)
+            card = BingoCard(
+                n=config["n"],
+                pool_max=config["pool_max"],
+                free_center=config["free_center"],
+                seed=config["seed"],
+            )
+            drawer = NumberDrawer(pool_max=config["pool_max"], seed=config["seed"])
             print(color("\nNew card generated.", "yellow"))
             print(card.render(color_fn=color))
         elif cmd == "D":

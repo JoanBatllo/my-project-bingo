@@ -82,3 +82,19 @@ def test_render_returns_human_readable_string():
     assert "\n" in out
     # should contain at least one digit
     assert re.search(r"\d", out) is not None
+
+
+def test_free_center_is_marked_and_rendered():
+    """When requested, the center cell is a free space that is always marked."""
+    card = BingoCard(n=5, pool_max=75, free_center=True, seed=123)
+    center = card.n // 2
+
+    assert card.grid[center][center] == 0
+    assert (center, center) in card.marked
+
+    # Attempting to toggle the free center should leave it marked.
+    card.toggle_mark(center, center)
+    assert (center, center) in card.marked
+
+    rendered = card.render()
+    assert "FREE" in rendered
