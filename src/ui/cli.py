@@ -4,16 +4,8 @@ from typing import Optional, Set
 from src.game.bingo_card import BingoCard
 from src.game.number_drawer import NumberDrawer
 from src.game.win_checker import has_bingo
+from .constants import ANSI, COMMANDS_HELP
 
-# ANSI helpers only for the UI
-ANSI = {
-    "reset": "\033[0m",
-    "bold": "\033[1m",
-    "green": "\033[32m",
-    "cyan": "\033[36m",
-    "yellow": "\033[33m",
-    "dim": "\033[2m",
-}
 def color(text: str, c: Optional[str] = None) -> str:
     if not c or c not in ANSI:
         return f"{text}"
@@ -57,17 +49,7 @@ def ask_optional_int(prompt: str) -> Optional[int]:
             print("Please enter a valid integer or leave blank.")
 
 def help_menu() -> None:
-    print(
-        "\nCommands:\n"
-        "  S  - Show card\n"
-        "  D  - Draw a number (auto-marks if on your card)\n"
-        "  M  - Manually toggle mark at row,col (e.g., M 1,2)\n"
-        "  B  - Call BINGO! (system validates)\n"
-        "  I  - Show game info/status\n"
-        "  R  - Reset (new card & reshuffled pool)\n"
-        "  H  - Help\n"
-        "  Q  - Quit\n"
-    )
+    print(COMMANDS_HELP)
 
 def main() -> None:
     print(color("\n=== Terminal Bingo MVP ===\n", "bold"))
