@@ -5,7 +5,7 @@ from typing import List, Set, Tuple, Optional
 from .exceptions import InvalidBoardError
 
 class BingoCard:
-    """Genera y gestiona un cartón N×N con números únicos."""
+    """Generates and manages an N×N bingo card with unique, non-repeating numbers."""
     def __init__(self, n: int, pool_max: int):
         if n not in (3, 4, 5):
             raise InvalidBoardError("Board size N must be 3, 4, or 5")
@@ -46,7 +46,7 @@ class BingoCard:
         return False
 
     def render(self, color_fn=None) -> str:
-        """Devuelve una representación de texto; color_fn(text, name)->str (opcional)."""
+        """Returns a text representation; color_fn(text, name) -> str (optional)."""
         if color_fn is None:
             color_fn = lambda s, _name=None: s
         max_num = max(max(row) for row in self.grid)

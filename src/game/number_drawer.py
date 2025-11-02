@@ -3,7 +3,7 @@ import random
 from typing import List, Optional
 
 class NumberDrawer:
-    """Maneja el bombo de números 1..pool_max sin repetición."""
+    """Handles the number pool from 1 to pool_max without repetition."""
     def __init__(self, pool_max: int):
         self.pool_max = int(pool_max)
         self._pile: List[int] = []

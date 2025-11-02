@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-#!/usr/bin/env python3
 from typing import Optional, Set
 
-from game import BingoCard
-from game import NumberDrawer
-from game import has_bingo
+from src.game.bingo_card import BingoCard
+from src.game.number_drawer import NumberDrawer
+from src.game.win_checker import has_bingo
 
-# ANSI helpers solo para la UI
+# ANSI helpers only for the UI
 ANSI = {
     "reset": "\033[0m",
     "bold": "\033[1m",
