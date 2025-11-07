@@ -1,6 +1,16 @@
 from src.game.number_drawer import NumberDrawer
 
 
+def test_drawer_rejects_invalid_pool():
+    """pool_max must be positive."""
+    for value in (0, -5):
+        try:
+            NumberDrawer(pool_max=value)
+            assert False, f"Expected ValueError for pool_max={value}"
+        except ValueError:
+            pass
+
+
 def test_drawer_draws_without_repetition_and_exhausts():
     """
     NumberDrawer should:
@@ -46,3 +56,27 @@ def test_drawer_reset_restores_full_pool():
     # after reset, pile is full again
     assert drawer.remaining() == 10
     assert drawer.drawn == []
+
+
+def test_drawer_seed_allows_reproducible_draws():
+    """Providing the same seed should reproduce the exact draw order."""
+    seed = 42
+    drawer_a = NumberDrawer(pool_max=20, seed=seed)
+    drawer_b = NumberDrawer(pool_max=20, seed=seed)
+
+    draws_a = [drawer_a.draw() for _ in range(10)]
+    draws_b = [drawer_b.draw() for _ in range(10)]
+    assert draws_a == draws_b
+
+    # Reset without changing the seed keeps the determinism aligned.
+    drawer_a.reset()
+    drawer_b.reset()
+    assert [drawer_a.draw() for _ in range(5)] == [drawer_b.draw() for _ in range(5)]
+
+    # Changing the seed should alter the future order.
+    drawer_a.reset(seed=seed + 1)
+    drawer_b.reset(seed=seed + 1)
+    new_draws_a = [drawer_a.draw() for _ in range(5)]
+    new_draws_b = [drawer_b.draw() for _ in range(5)]
+    assert new_draws_a == new_draws_b
+    assert new_draws_a != draws_a[:5]
