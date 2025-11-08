@@ -19,3 +19,5 @@ build/
 # Editor / IDE settings
 .vscode/
 .idea/
+
+.coverage
