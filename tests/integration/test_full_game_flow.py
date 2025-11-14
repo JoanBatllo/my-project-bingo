@@ -1,12 +1,9 @@
 """
-Integration test:
-Simulates a mini game loop without using the real CLI input().
-We:
-1. Create a BingoCard and a NumberDrawer.
-2. Repeatedly draw numbers.
-3. Auto-mark any numbers that match the card.
-4. Stop when we detect bingo with has_bingo().
-This proves that the full core loop (card + drawing + marking + win check) works together.
+Integration test for the full game flow of the Bingo application.
+
+This test simulates a mini game loop without using real CLI input. It verifies
+that the BingoCard, NumberDrawer, and win-checking logic work together
+correctly as an integrated system.
 """
 
 from src.game.bingo_card import BingoCard
@@ -15,6 +12,25 @@ from src.game.win_checker import has_bingo
 
 
 def test_full_game_flow_reaches_bingo():
+    """Runs an end-to-end integration test of the Bingo game flow.
+
+    This test performs the following steps:
+        1. Creates a BingoCard and a NumberDrawer.
+        2. Repeatedly draws numbers from the drawer.
+        3. Automatically marks numbers on the card when drawn.
+        4. Checks for a bingo condition after each draw.
+        5. Ensures that the loop terminates either by achieving bingo or by
+           exhausting the number pool.
+
+    The purpose is to confirm that the core mechanics—number drawing, card
+    marking, and bingo detection—function correctly together.
+
+    Raises:
+        AssertionError: If the loop exceeds a safe iteration limit
+            (indicating a possible infinite loop).
+        AssertionError: If the game fails to produce a bingo by the time all
+            card numbers could have been drawn.
+    """
     # Use a small board so test finishes fast
     n = 3
     pool_max = 30
@@ -22,7 +38,6 @@ def test_full_game_flow_reaches_bingo():
     card = BingoCard(n=n, pool_max=pool_max)
     drawer = NumberDrawer(pool_max=pool_max)
 
-    # simulate gameplay: draw numbers, auto-mark matches
     bingo = False
     safety_counter = 0
 
@@ -31,19 +46,18 @@ def test_full_game_flow_reaches_bingo():
         if number is None:
             break
 
-        # mark card if that number is on it
+        # Mark card if that number is on it
         card.auto_mark_if_present(number)
 
-        # check win condition after each draw
+        # Check win condition after each draw
         if has_bingo(card.marked, card.n):
             bingo = True
             break
 
         safety_counter += 1
-        # sanity stop to avoid infinite loop in case of bug
         assert safety_counter < 500, "Something is wrong, infinite loop?"
 
-    # By the time we've drawn enough numbers,
-    # we EXPECT to have achieved bingo on a 3x3.
-    # (Worst case: after we have drawn all 9 numbers that were on the card.)
-    assert bingo is True, "End-to-end game flow should eventually produce a bingo"
+    # We expect a bingo on a 3x3 by the time enough numbers are drawn.
+    assert bingo is True, (
+        "End-to-end game flow should eventually produce a bingo"
+    )
