@@ -2,7 +2,15 @@ from src.game.number_drawer import NumberDrawer
 
 
 def test_drawer_rejects_invalid_pool():
-    """pool_max must be positive."""
+    """Tests that NumberDrawer rejects non-positive pool_max values.
+
+    Valid behavior:
+        - pool_max must be strictly positive.
+        - Creating a NumberDrawer with pool_max <= 0 should raise ValueError.
+
+    Raises:
+        AssertionError: If NumberDrawer does not raise ValueError for invalid input.
+    """
     for value in (0, -5):
         try:
             NumberDrawer(pool_max=value)
@@ -12,11 +20,16 @@ def test_drawer_rejects_invalid_pool():
 
 
 def test_drawer_draws_without_repetition_and_exhausts():
-    """
-    NumberDrawer should:
-    - draw numbers without repeating
-    - eventually return None when empty
-    - track how many are left
+    """Tests that NumberDrawer draws unique numbers and exhausts properly.
+
+    Validates that:
+        - draw() returns each number at most once.
+        - draw() eventually returns None when the pool is empty.
+        - remaining() correctly tracks how many values are left.
+
+    Raises:
+        AssertionError: If duplicate draws occur, pool size is incorrect,
+            or exhaustion logic fails.
     """
     drawer = NumberDrawer(pool_max=15)
 
@@ -27,6 +40,7 @@ def test_drawer_draws_without_repetition_and_exhausts():
         x = drawer.draw()
         if x is None:
             break
+
         # number should never repeat
         assert x not in seen
         seen.add(x)
@@ -38,18 +52,23 @@ def test_drawer_draws_without_repetition_and_exhausts():
 
 
 def test_drawer_reset_restores_full_pool():
-    """
-    After drawing some numbers, reset() should:
-    - reshuffle a full new pile
-    - clear 'drawn'
-    - restore remaining() == pool_max
+    """Tests that reset() restores the drawer to a full fresh state.
+
+    After reset(), the drawer must:
+        - Rebuild a full shuffled pile of numbers.
+        - Clear the internal `drawn` list.
+        - Report remaining() == pool_max.
+
+    Raises:
+        AssertionError: If the pile is not fully restored or if state persists
+            after the reset.
     """
     drawer = NumberDrawer(pool_max=10)
 
     # consume some draws
     for _ in range(4):
         _ = drawer.draw()
-    assert drawer.remaining() == 6  # 10-4
+    assert drawer.remaining() == 6  # 10 - 4
 
     drawer.reset()
 
@@ -59,7 +78,17 @@ def test_drawer_reset_restores_full_pool():
 
 
 def test_drawer_seed_allows_reproducible_draws():
-    """Providing the same seed should reproduce the exact draw order."""
+    """Tests deterministic behavior when NumberDrawer is initialized with a seed.
+
+    Validates that:
+        - Two drawers with the same seed produce the same draw sequence.
+        - reset() without changing the seed preserves determinism.
+        - Changing the seed results in a different future sequence.
+
+    Raises:
+        AssertionError: If deterministic behavior fails or if reseeding
+            does not alter the draw order as expected.
+    """
     seed = 42
     drawer_a = NumberDrawer(pool_max=20, seed=seed)
     drawer_b = NumberDrawer(pool_max=20, seed=seed)
@@ -68,7 +97,7 @@ def test_drawer_seed_allows_reproducible_draws():
     draws_b = [drawer_b.draw() for _ in range(10)]
     assert draws_a == draws_b
 
-    # Reset without changing the seed keeps the determinism aligned.
+    # Reset without changing the seed keeps determinism aligned.
     drawer_a.reset()
     drawer_b.reset()
     assert [drawer_a.draw() for _ in range(5)] == [drawer_b.draw() for _ in range(5)]
@@ -78,5 +107,6 @@ def test_drawer_seed_allows_reproducible_draws():
     drawer_b.reset(seed=seed + 1)
     new_draws_a = [drawer_a.draw() for _ in range(5)]
     new_draws_b = [drawer_b.draw() for _ in range(5)]
+
     assert new_draws_a == new_draws_b
     assert new_draws_a != draws_a[:5]
