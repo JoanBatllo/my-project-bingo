@@ -16,6 +16,7 @@ from .sql_constants import (
     CREATE_TABLE_PLAYERS,
     CREATE_TABLE_GAMES,
     CREATE_TABLE_RESULTS,
+    CREATE_TRIGGER_RESULTS_FK,
     CREATE_UNIQUE_IDX_PLAYERS_NAME,
     CREATE_IDX_RESULTS_PLAYER,
     CREATE_IDX_RESULTS_GAME,
@@ -77,11 +78,7 @@ class BingoRepository:
         self._create_schema()
 
     def _create_schema(self) -> None:
-        """Create the database schema if it does not exist.
-
-        This method is idempotent: all ``CREATE TABLE`` and ``CREATE INDEX``
-        statements are written so that running them multiple times is safe.
-        """
+        """Create the database schema if it does not exist."""
         cur = self._conn.cursor()
         # Core tables.
         cur.execute(CREATE_TABLE_PLAYERS)
@@ -91,6 +88,8 @@ class BingoRepository:
         cur.execute(CREATE_UNIQUE_IDX_PLAYERS_NAME)
         cur.execute(CREATE_IDX_RESULTS_PLAYER)
         cur.execute(CREATE_IDX_RESULTS_GAME)
+        # Trigger for enforcing FK-like behavior on other connections (tests)
+        cur.execute(CREATE_TRIGGER_RESULTS_FK)
         self._conn.commit()
 
     # --- Private helpers -----------------------------------------------------

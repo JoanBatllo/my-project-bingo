@@ -12,8 +12,10 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE_TABLE_GAMES = """
 CREATE TABLE IF NOT EXISTS games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    board_size INTEGER NOT NULL CHECK (board_size IN (3,4,5)),
-    pool_max INTEGER NOT NULL CHECK (pool_max >= 1),
+    board_size INTEGER NOT NULL
+        CHECK (board_size IN (3,4,5)),
+    pool_max INTEGER NOT NULL
+        CHECK (pool_max >= board_size * board_size),
     finished_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )
 """
@@ -23,11 +25,26 @@ CREATE TABLE IF NOT EXISTS results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id INTEGER NOT NULL,
     game_id INTEGER NOT NULL,
-    won INTEGER NOT NULL CHECK (won IN (0,1)),
-    draws_count INTEGER NOT NULL,
+    won INTEGER NOT NULL
+        CHECK (won IN (0,1)),
+    draws_count INTEGER NOT NULL
+        CHECK (draws_count >= 0),
     FOREIGN KEY (player_id) REFERENCES players(id),
     FOREIGN KEY (game_id) REFERENCES games(id)
 )
+"""
+
+# Trigger to enforce foreign key-like behaviour even if PRAGMA foreign_keys
+# is not enabled on a different SQLite connection (like in the test).
+CREATE_TRIGGER_RESULTS_FK = """
+CREATE TRIGGER IF NOT EXISTS fk_results_player_game
+BEFORE INSERT ON results
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'foreign key constraint failed')
+    WHERE (SELECT id FROM players WHERE id = NEW.player_id) IS NULL
+       OR (SELECT id FROM games   WHERE id = NEW.game_id)   IS NULL;
+END;
 """
 
 # --- Indexes ---
