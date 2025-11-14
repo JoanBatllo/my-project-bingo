@@ -2,12 +2,16 @@ from src.game.win_checker import has_bingo
 
 
 def test_row_column_and_diagonal_bingo():
-    """
-    has_bingo(marked, n) should detect:
-    - complete row
-    - complete column
-    - main diagonal
-    - anti-diagonal
+    """Tests that has_bingo() correctly detects all valid bingo patterns.
+
+    Valid patterns include:
+        - A complete row.
+        - A complete column.
+        - A complete main diagonal (top-left → bottom-right).
+        - A complete anti-diagonal (top-right → bottom-left).
+
+    Raises:
+        AssertionError: If any valid bingo configuration is not detected.
     """
     n = 5
 
@@ -19,19 +23,27 @@ def test_row_column_and_diagonal_bingo():
     marked = {(r, 2) for r in range(n)}
     assert has_bingo(marked, n) is True
 
-    # Main diagonal (0,0) (1,1) (2,2) ...
+    # Main diagonal
     marked = {(i, i) for i in range(n)}
     assert has_bingo(marked, n) is True
 
-    # Anti-diagonal (0,n-1) (1,n-2) ...
+    # Anti-diagonal
     marked = {(i, n - 1 - i) for i in range(n)}
     assert has_bingo(marked, n) is True
 
 
 def test_no_false_positive_bingo():
-    """
-    Partial markings should NOT count as a win.
+    """Tests that incomplete markings do not produce a bingo.
+
+    Validates that:
+        - Partial rows.
+        - Partial columns.
+        - Partial diagonals.
+    do NOT trigger a win.
+
+    Raises:
+        AssertionError: If has_bingo() incorrectly returns True.
     """
     n = 5
-    marked = {(0, 0), (0, 1), (1, 1)}  # not a full row / col / diag
+    marked = {(0, 0), (0, 1), (1, 1)}  # Not a full row, column, or diagonal
     assert has_bingo(marked, n) is False
