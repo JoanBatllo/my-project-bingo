@@ -313,6 +313,8 @@ def test_foreign_key_constraint(tmp_path: Path):
     repo = BingoRepository(str(db_path))
     try:
         conn = sqlite3.connect(str(db_path))
+        conn.isolation_level = None
+        conn.execute("PRAGMA foreign_keys = ON;")
         cur = conn.cursor()
 
         with pytest.raises(sqlite3.IntegrityError):
@@ -340,6 +342,8 @@ def test_check_constraints(tmp_path: Path):
     repo = BingoRepository(str(db_path))
     try:
         conn = sqlite3.connect(str(db_path))
+        conn.isolation_level = None
+        conn.execute("PRAGMA foreign_keys = ON;")
         cur = conn.cursor()
 
         with pytest.raises(sqlite3.IntegrityError):

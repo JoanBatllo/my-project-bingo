@@ -9,7 +9,9 @@ access for players, games and results. It is responsible for:
 - Computing a simple leaderboard based on stored results.
 """
 
+import os
 import sqlite3
+from pathlib import Path
 from typing import List, Optional, TypedDict
 
 from .sql_constants import (
@@ -50,7 +52,7 @@ class BingoRepository:
         wins: int
         win_rate: float
 
-    def __init__(self, db_path: str = "Data/bingo.db") -> None:
+    def __init__(self, db_path: Optional[str] = None) -> None:
         """Initialize a new repository instance.
 
         The constructor opens a connection to the given SQLite database,
@@ -58,11 +60,21 @@ class BingoRepository:
         and ensures that the schema exists.
 
         Args:
-            db_path: Path to the SQLite database file. The default is
-                ``"bingo.db"``. For tests or in-memory usage you can pass
+            db_path: Path to the SQLite database file. If ``None`` a default is
+                taken from the ``BINGO_DB_PATH`` environment variable
+                (fallback ``"data/bingo.db"``). For tests you can pass
                 ``":memory:"`` or a temporary path.
         """
-        self._conn: Optional[sqlite3.Connection] = sqlite3.connect(db_path)
+        default_db_path = os.environ.get("BINGO_DB_PATH", "data/bingo.db")
+        resolved_path = (
+            Path(db_path)
+            if db_path is not None
+            else Path(default_db_path)
+        )
+        if resolved_path != Path(":memory:"):
+            resolved_path.parent.mkdir(parents=True, exist_ok=True)
+
+        self._conn: Optional[sqlite3.Connection] = sqlite3.connect(str(resolved_path))
         self._conn.row_factory = sqlite3.Row
 
         # Pragmas for safety and minimal concurrency support.

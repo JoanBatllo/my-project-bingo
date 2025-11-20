@@ -24,7 +24,8 @@ This project is built following **Scrum methodology**, divided into sprints, wit
     ├── docs
     │   └── architecture.md
     ├── main.py
-    ├── requirements.txt
+    ├── pyproject.toml
+    ├── uv.lock
     ├── src
     │   ├── __init__.py
     │   ├── game
@@ -54,21 +55,30 @@ git clone https://github.com/JoanBatllo/my-project-bingo.git
 cd my-project-bingo
 ```
 
-### 2. Create a Virtual environment
+### 2. Install dependencies with [uv](https://github.com/astral-sh/uv)
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # (Windows: .venv\Scripts\activate)
+uv sync
 ```
 
-### 3. Install dependencies
+`uv sync` will create `.venv/` for you and install both runtime and dev dependencies.
+
+### 3. Activate the environment (optional)
 ```bash
-pip install -r requirements.txt
+source .venv/bin/activate  # (Windows: .venv\Scripts\activate)
 ```
+If you prefer not to activate the virtual environment, prefix commands with `uv run ...`.
 
 ## How to run the game
 ```bash
-python main.py
+uv run python main.py
 ```
+
+### Run via Docker
+```bash
+make docker-build
+make docker-run
+```
+`docker-run` depends on the freshly built image and starts the game inside a container.
 
 Commands available inside the game:
  • S → Show current Bingo card
@@ -85,12 +95,12 @@ All tests are written with **pytest**.
 
 ### Run all tests
 ```bash
-pytest
+uv run pytest
 ```
 
 ### Run tests with coverage
 ```bash
-pytest --cov=src --cov-report=term-missing
+uv run pytest --cov=src --cov-report=term-missing
 ```
 
 ## Continuous Integration (GitHub Actions)
