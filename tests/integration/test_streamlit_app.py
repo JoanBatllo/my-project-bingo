@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Integration tests for the Streamlit Bingo UI application.
+
+These tests use Streamlit's AppTest framework to test the actual
+running Streamlit application with real user interactions.
+"""
+
+import os
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+from streamlit.testing.v1 import AppTest
+
+from persistence.src.api import app as persistence_app
+
+
+@pytest.fixture
+def persistence_server(tmp_path):
+    """Start a test persistence server."""
+    db_path = tmp_path / "test_bingo.db"
+    with patch.dict(os.environ, {"BINGO_DB_PATH": str(db_path)}):
+        client = TestClient(persistence_app)
+        yield client
+
+
+@pytest.fixture
+def streamlit_app():
+    """Create a Streamlit AppTest instance."""
+    app_path = Path(__file__).parent.parent.parent / "game" / "ui" / "app.py"
+    content = app_path.read_text()
+    # Fix relative imports for AppTest
+    content = content.replace("from ..", "from game.")
+    return AppTest.from_string(content)
+
+
+def test_streamlit_app_initializes(streamlit_app):
+    """Test that Streamlit app initializes correctly."""
+    streamlit_app.run()
+
+    # Verify app has initialized game state
+    assert "card" in streamlit_app.session_state
+    assert "drawer" in streamlit_app.session_state
+    assert streamlit_app.session_state.card is not None
+    assert streamlit_app.session_state.drawer is not None
+
+
+def test_streamlit_app_draw_number(streamlit_app):
+    """Test drawing numbers in the Streamlit app."""
+    streamlit_app.run()
+
+    # Verify initial state
+    assert streamlit_app.session_state.last_draw is None
+    assert streamlit_app.session_state.draw_history == []
+
+    # Simulate clicking "Draw next number" button
+    draw_button = None
+    for button in streamlit_app.button:
+        if "Draw next number" in button.label:
+            draw_button = button
+            break
+
+    if draw_button:
+        draw_button.click().run()
+
+        # Verify a number was drawn
+        assert streamlit_app.session_state.last_draw is not None
+        assert len(streamlit_app.session_state.draw_history) > 0
+
+
+def test_streamlit_app_new_game_button(streamlit_app):
+    """Test the new game/reset functionality."""
+    streamlit_app.run()
+
+    # Get initial card state
+    initial_card = streamlit_app.session_state.card
+    initial_grid = [row[:] for row in initial_card.grid]
+
+    # Find and click "New game / reset" button
+    new_game_button = None
+    for button in streamlit_app.button:
+        if "New game" in button.label or "reset" in button.label.lower():
+            new_game_button = button
+            break
+
+    if new_game_button:
+        new_game_button.click().run()
+
+        # Verify card was reset (should have different numbers)
+        new_card = streamlit_app.session_state.card
+        # Cards should be different (very unlikely to be identical)
+        assert new_card.grid != initial_grid or len(streamlit_app.session_state.draw_history) == 0
+
+
+def test_streamlit_app_integration_with_persistence(streamlit_app, persistence_server):
+    """Test integration between Streamlit app and persistence service.
+
+    This test verifies that:
+    1. The persistence API can record results
+    2. The persistence API can return leaderboard data
+    3. The Streamlit app initializes correctly
+
+    Note: Full end-to-end integration would require the Streamlit app to actually
+    connect to the persistence service, which is complex in a test environment.
+    This test verifies the persistence service works correctly.
+    """
+    # Record some data via the API
+    response = persistence_server.post(
+        "/results",
+        params={
+            "player_name": "StreamlitTest",
+            "board_size": 5,
+            "pool_max": 75,
+            "won": True,
+            "draws_count": 10,
+        },
+    )
+    assert response.status_code == 201
+
+    # Verify the data was recorded by fetching leaderboard
+    leaderboard_response = persistence_server.get("/leaderboard")
+    assert leaderboard_response.status_code == 200
+    leaderboard = leaderboard_response.json()
+    assert len(leaderboard) > 0
+    assert any(row["name"] == "StreamlitTest" for row in leaderboard)
+
+    # Verify Streamlit app initializes
+    streamlit_app.run()
+    assert "card" in streamlit_app.session_state

@@ -6,9 +6,8 @@ that the BingoCard, NumberDrawer, and win-checking logic work together
 correctly as an integrated system.
 """
 
-from src.game.bingo_card import BingoCard
-from src.game.number_drawer import NumberDrawer
-from src.game.win_checker import has_bingo
+from game.src.bingo_card import BingoCard
+from game.src.number_drawer import NumberDrawer
 
 
 def test_full_game_flow_reaches_bingo():
@@ -50,7 +49,7 @@ def test_full_game_flow_reaches_bingo():
         card.auto_mark_if_present(number)
 
         # Check win condition after each draw
-        if has_bingo(card.marked, card.n):
+        if card.has_bingo:
             bingo = True
             break
 
