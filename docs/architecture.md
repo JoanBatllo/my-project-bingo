@@ -1,6 +1,6 @@
 ## Architecture Overview
 
-This project implements a small, modular Bingo game designed for the terminal. The core is framework‑agnostic Python code living under `src/game`, with a thin CLI layer in `src/ui`. Tests validate the game logic end‑to‑end.
+This project implements a small, modular Bingo game with a Streamlit web UI. The core is framework‑agnostic Python code living under `src/game`; presentation lives in `src/ui/streamlit_app.py`. Tests validate the game logic end‑to‑end.
 
 ### Goals
 - Keep core logic pure and testable
@@ -24,8 +24,8 @@ This project implements a small, modular Bingo game designed for the terminal. T
     - `reset(seed: int | None = None)`
 - `src/game/win_checker.py`
   - `has_bingo(marked: set[tuple[int,int]], n: int) -> bool`: Validates completed rows, columns, and diagonals using only the set of marked coordinates. This keeps it UI‑agnostic and easy to test.
-- `src/ui/cli.py`
-  - Minimal user interface that wires input commands to the game modules. All formatting (ANSI colors) is localized here.
+- `src/ui/streamlit_app.py`
+  - Streamlit interface that wires user actions (draw, toggle marks, call bingo) to the game modules and renders the board interactively.
 
 ### Data Model
 - `BingoCard.grid: list[list[int]]` — 2D array of numbers; free center is represented by `0` when enabled.
@@ -73,7 +73,7 @@ src/
     win_checker.py
     exceptions.py
   ui/
-    cli.py
+    streamlit_app.py
 tests/
   unit/
   integration/

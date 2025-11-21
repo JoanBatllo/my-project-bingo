@@ -1,10 +1,9 @@
-# My-project-bingo: Terminal Bingo
+# My-project-bingo: Streamlit Bingo
 
 ![Tests](https://github.com/JoanBatllo/my-project-bingo/actions/workflows/tests.yml/badge.svg)
 
 ## Overview
-**My Project Bingo** is a simple **terminal-based Bingo game** developed in Python.
-It allows players to generate a configurable Bingo card (`3×3`, `4×4`, or `5×5`), draw random numbers without repetition, mark hits automatically, and validate "Bingo!", all within a clean command-line interface.
+**My Project Bingo** is a simple Bingo game developed in Python with a **Streamlit** web UI. Generate a configurable Bingo card (`3×3`, `4×4`, or `5×5`), draw random numbers without repetition, mark hits automatically, and validate "Bingo!" in the browser.
 
 This project is built following **Scrum methodology**, divided into sprints, with a focus on modular, testable, and maintainable code.
 
@@ -13,7 +12,7 @@ This project is built following **Scrum methodology**, divided into sprints, wit
 - Random, non-repeating number draws
 - Automatic and manual marking of numbers
 - “Bingo!” validation (rows, columns, diagonals)
-- Fully functional terminal UI
+- Streamlit UI with clickable cells, draw controls, and live status
 - Unit and integration tests with `pytest`
 
 ## Project Structure
@@ -36,7 +35,7 @@ This project is built following **Scrum methodology**, divided into sprints, wit
     │   │   └── win_checker.py
     │   └── ui
     │       ├── __init__.py
-    │       └── cli.py
+    │       └── streamlit_app.py
     └── tests
         ├── integration
         │   ├── __init__.py
@@ -70,24 +69,20 @@ If you prefer not to activate the virtual environment, prefix commands with `uv 
 
 ## How to run the game
 ```bash
-uv run python main.py
+uv run streamlit run src/ui/streamlit_app.py
 ```
+You can also use `make streamlit` or `make run`. The app launches at http://localhost:8501 with clickable cells, draw controls, and live bingo status.
 
 ### Run via Docker
 ```bash
 make docker-build
 make docker-run
 ```
-`docker-run` depends on the freshly built image and starts the game inside a container.
-
-Commands available inside the game:
- • S → Show current Bingo card
- • D → Draw a number (auto-marks if found)
- • M r,c → Manually toggle a cell mark (e.g. M 1,2)
- • B → Call “Bingo!” (system validates)
- • I → Show current game status
- • R → Reset and generate a new card
- • Q → Quit the game
+Streamlit via Docker Compose:
+```bash
+docker compose up bingo-streamlit
+```
+`docker-run` builds and starts the API container; `docker compose up bingo-streamlit` launches the Streamlit UI.
 
 ## How to Run Tests
 

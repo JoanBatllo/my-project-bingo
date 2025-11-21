@@ -7,19 +7,19 @@ variables. Although the plan may evolve, documenting it in one place keeps the
 direction clear for future iterations.
 
 ## 1. Container Build Strategy (Dockerfile)
-The Dockerfile now defines a common **`base` stage** plus two distinct targets so
-we can produce separate CLI and API images without duplicating steps:
+The Dockerfile defines a common **`base` stage** plus two distinct targets so we
+can produce separate API and Streamlit images without duplicating steps:
 
 1. **Base stage (`base`)** – starts from `python:3.12-slim`, sets `WORKDIR` to
    `/app`, installs `uv`, copies `pyproject.toml`, `uv.lock`, `README.md`, and
    `LICENSE.md`, then runs `uv sync --frozen --no-dev --no-install-project` to
    create the runtime environment before copying `src/` and `main.py`.
-2. **CLI stage (`cli`)** – `FROM base AS cli` with `CMD ["uv", "run",
-   "python", "main.py"]`. No port exposure is required; this image is focused
-   on the interactive terminal.
-3. **API stage (`api`)** – `FROM base AS api`, `EXPOSE 8000`, and `CMD ["uv",
+2. **API stage (`api`)** – `FROM base AS api`, `EXPOSE 8000`, and `CMD ["uv",
    "run", "uvicorn", "src.api.leaderboard:app", "--host", "0.0.0.0",
    "--port", "8000"]`. This target bakes in the HTTP entry point.
+3. **Streamlit stage (`streamlit`)** – `FROM base AS streamlit`, `EXPOSE 8501`,
+   and `CMD ["uv", "run", "streamlit", "run", "src/ui/streamlit_app.py", ...]`
+   to publish the web UI.
 
 Because the heavy lifting lives in the base stage, rebuilding either image reuses
 cached layers and guarantees identical dependency sets.
@@ -28,15 +28,6 @@ cached layers and guarantees identical dependency sets.
 Compose now builds **two images** from the single Dockerfile by selecting the
 appropriate target per service:
 
-- **`bingo-cli`**
-  - Purpose: interactive terminal experience for end users.
-  - Image: `my-project-bingo-cli` (built with `target: cli`). Command is baked
-    in as `uv run python main.py`, so Compose no longer overrides it.
-  - TTY/STDIN: `stdin_open: true` and `tty: true` allow users to play through
-    `docker compose run bingo-cli`.
-  - Environment: `BINGO_DB_PATH=/app/data/bingo.db` so the persistence layer
-    writes to the shared volume.
-
 - **`leaderboard-api`**
   - Purpose: exposes a FastAPI app (`src.api.leaderboard:app`) backed by the
     same SQLite database for viewing stats via HTTP.
@@ -44,6 +35,14 @@ appropriate target per service:
     `uv run uvicorn ... --port 8000`.
   - Ports: binds container port `8000` to host `8000` for browser access.
   - Environment: same `BINGO_DB_PATH` so records and API reads are consistent.
+
+- **`bingo-streamlit`**
+  - Purpose: publishes the Streamlit UI for playing/viewing bingo in the
+    browser.
+  - Image: `my-project-bingo-streamlit` (built with `target: streamlit`) which
+    runs `uv run streamlit run src/ui/streamlit_app.py`.
+  - Ports: binds container port `8501` to host `8501` for browser access.
+  - Environment: shares `BINGO_DB_PATH` so it reads/writes the same SQLite DB.
 
 - **Future `tests` profile (optional)**
   - Could reuse the image to launch `uv run pytest`. Keeping this as a profile
@@ -71,16 +70,16 @@ Before rendering the workflow, we spell out each responsibility:
 
 - **Dockerfile pipeline** – base `python:3.12-slim`, install `uv`, copy
   dependency manifests, run `uv sync --frozen`, copy application code. Two
-  final targets (`cli`, `api`) extend this base so we obtain separate runtime
-  images without duplicating layers.
-- **CLI image** – inherits from the base stage and ships the interactive CMD
-  (`uv run python main.py`).
-- **API image** – inherits from the same base but exposes port `8000` and runs
+  final targets (`api`, `streamlit`) extend this base so we obtain separate
+  runtime images without duplicating layers.
+- **API image** – inherits from the base stage, exposes port `8000`, and runs
   `uv run uvicorn src.api.leaderboard:app --host 0.0.0.0 --port 8000`.
-- **Compose services** – `bingo-cli` launches `uv run python main.py` with
-  interactive TTY, while `leaderboard-api` runs Uvicorn exposing
-  `GET /leaderboard` and publishes `8000:8000`. Future optional profiles (tests
-  or linting) would reuse the same pattern.
+- **Streamlit image** – inherits from the same base, exposes `8501`, and runs
+  the Streamlit UI.
+- **Compose services** – `leaderboard-api` runs Uvicorn exposing
+  `GET /leaderboard` and publishes `8000:8000`, while `bingo-streamlit`
+  publishes `8501:8501` for the browser. Future optional profiles (tests or
+  linting) would reuse the same pattern.
 - **Persistence** – named volume `bingo-data` mounted at `/app/data` stores the
   SQLite DB; every service points to it via `BINGO_DB_PATH`.
 - **Networking** – default bridge network gives internal connectivity; only the
@@ -88,15 +87,15 @@ Before rendering the workflow, we spell out each responsibility:
 
 ```
         +------------------+        +-----------------------+
-        |   bingo-cli      |        |   leaderboard-api     |
-        | (python main.py) |        | (FastAPI / Uvicorn)   |
-        +---------+--------+        +-----------+-----------+
-                  |                             |
-                  |   reads/writes games        |
-                  +-------------+---------------+
-                                |
-                        bingo-data volume
-                   (/app/data/bingo.db shared)
+        |   bingo-streamlit |        |   leaderboard-api     |
+        | (Streamlit UI)    |        | (FastAPI / Uvicorn)   |
+        +---------+---------+        +-----------+-----------+
+                  |                              |
+                  |   reads/writes games         |
+                  +--------------+---------------+
+                                 |
+                         bingo-data volume
+                    (/app/data/bingo.db shared)
 ```
 
 ```mermaid
@@ -115,17 +114,17 @@ flowchart TD
     A5 --> BaseStage
 
     subgraph Images["Final Docker Images"]
-        CLI_IMG["CLI image\n(target: cli, cmd=uv run python main.py)"]
         API_IMG["API image\n(target: api, cmd=uv run uvicorn..., EXPOSE 8000)"]
+        ST_IMG["Streamlit image\n(target: streamlit, cmd=uv run streamlit..., EXPOSE 8501)"]
     end
-    BaseStage --> CLI_IMG
     BaseStage --> API_IMG
+    BaseStage --> ST_IMG
 
     subgraph Compose["Docker Compose Services"]
         direction LR
-        subgraph CLI["bingo-cli container"]
-            C1["Runs CLI image"]
-            C2["stdin_open + tty"]
+        subgraph ST["bingo-streamlit container"]
+            S1["Runs Streamlit image"]
+            S2["Publishes 8501:8501"]
         end
         subgraph API["leaderboard-api container"]
             L1["Runs API image"]
@@ -133,21 +132,22 @@ flowchart TD
             L3["Publishes 8000:8000"]
         end
     end
-    CLI_IMG --> C1
+    ST_IMG --> S1
     API_IMG --> L1
 
     subgraph Volume["bingo-data Volume"]
         V1["SQLite DB /app/data/bingo.db"]
     end
-    C1 -->|BINGO_DB_PATH| V1
+    S1 -->|BINGO_DB_PATH| V1
     L1 -->|BINGO_DB_PATH| V1
 
     subgraph Network["Bridge Network"]
         N1["Internal service communication"]
     end
-    CLI <--> N1
+    ST <--> N1
     API <--> N1
     L3 -->|host port 8000| Host[(External clients)]
+    S2 -->|host port 8501| Host
 
     subgraph Future["Future Expansion"]
         F1["Tests profile (pytest)"]
@@ -165,8 +165,8 @@ flowchart TD
     classDef future fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
 
     class A1,A2,A3,A4,A5,BaseStage build;
-    class CLI_IMG,API_IMG image;
-    class C1,C2,L1,L2,L3 service;
+    class API_IMG,ST_IMG image;
+    class S1,S2,L1,L2,L3 service;
     class V1 data;
     class N1,Host net;
     class F1,F2,F3 future;

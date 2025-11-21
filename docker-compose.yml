@@ -1,16 +1,4 @@
 services:
-  bingo-cli:
-    build:
-      context: .
-      target: cli
-    image: my-project-bingo-cli:latest
-    stdin_open: true
-    tty: true
-    environment:
-      BINGO_DB_PATH: /app/data/bingo.db
-    volumes:
-      - bingo-data:/app/data
-
   leaderboard-api:
     build:
       context: .
@@ -20,6 +8,18 @@ services:
       BINGO_DB_PATH: /app/data/bingo.db
     ports:
       - "8000:8000"
+    volumes:
+      - bingo-data:/app/data
+
+  bingo-streamlit:
+    build:
+      context: .
+      target: streamlit
+    image: my-project-bingo-streamlit:latest
+    environment:
+      BINGO_DB_PATH: /app/data/bingo.db
+    ports:
+      - "8501:8501"
     volumes:
       - bingo-data:/app/data
 
