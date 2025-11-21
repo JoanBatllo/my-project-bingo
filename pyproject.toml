@@ -12,6 +12,7 @@ license = { file = "LICENSE.md" }
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
+    "textual>=0.50.0",  # ← add this line
 ]
 
 [tool.hatch.build.targets.wheel]
