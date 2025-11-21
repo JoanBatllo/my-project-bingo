@@ -15,20 +15,20 @@ from pathlib import Path
 from typing import List, Optional, TypedDict
 
 from .sql_constants import (
-    CREATE_TABLE_PLAYERS,
     CREATE_TABLE_GAMES,
+    CREATE_TABLE_PLAYERS,
     CREATE_TABLE_RESULTS,
     CREATE_TRIGGER_RESULTS_FK,
-    CREATE_UNIQUE_IDX_PLAYERS_NAME,
-    CREATE_IDX_RESULTS_PLAYER,
     CREATE_IDX_RESULTS_GAME,
-    UPSERT_PLAYER_BY_NAME,
-    INSERT_OR_IGNORE_PLAYER,
-    SELECT_PLAYER_ID_BY_NAME,
-    PLAIN_INSERT_PLAYER,
+    CREATE_IDX_RESULTS_PLAYER,
+    CREATE_UNIQUE_IDX_PLAYERS_NAME,
     INSERT_GAME,
+    INSERT_OR_IGNORE_PLAYER,
     INSERT_RESULT,
+    PLAIN_INSERT_PLAYER,
     SELECT_LEADERBOARD,
+    SELECT_PLAYER_ID_BY_NAME,
+    UPSERT_PLAYER_BY_NAME,
 )
 
 
@@ -66,11 +66,9 @@ class BingoRepository:
                 ``":memory:"`` or a temporary path.
         """
         default_db_path = os.environ.get("BINGO_DB_PATH", "data/bingo.db")
-        resolved_path = (
-            Path(db_path)
-            if db_path is not None
-            else Path(default_db_path)
-        )
+        raw_path = Path(db_path) if db_path is not None else Path(default_db_path)
+        resolved_path = raw_path if raw_path == Path(":memory:") else raw_path.expanduser().resolve()
+
         if resolved_path != Path(":memory:"):
             resolved_path.parent.mkdir(parents=True, exist_ok=True)
 

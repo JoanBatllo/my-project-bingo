@@ -2,17 +2,17 @@
 import random
 from typing import List, Optional, Set, Tuple
 
-from .exceptions import InvalidBoardError
 
 class BingoCard:
     """Generates and manages an N×N bingo card with unique, non-repeating numbers."""
+
     def __init__(self, n: int, pool_max: int, *, free_center: bool = False, seed: Optional[int] = None):
         if n not in (3, 4, 5):
-            raise InvalidBoardError("Board size N must be 3, 4, or 5")
+            raise ValueError("Board size N must be 3, 4, or 5")
         if pool_max < n * n:
-            raise InvalidBoardError("pool_max must be at least N*N to ensure unique values.")
+            raise ValueError("pool_max must be at least N*N to ensure unique values.")
         if free_center and n % 2 == 0:
-            raise InvalidBoardError("Free center is only available for odd-sized boards.")
+            raise ValueError("Free center is only available for odd-sized boards.")
         self.n = n
         self.pool_max = pool_max
         self.free_center = bool(free_center) and n % 2 == 1
@@ -81,3 +81,21 @@ class BingoCard:
                 row_repr.append(cell)
             lines.append(color_fn(f"{r:>2}", "dim") + " " + " ".join(row_repr))
         return "\n".join(lines)
+
+    @property
+    def has_bingo(self) -> bool:
+        """Whether the current marked set contains a winning line."""
+        # Rows
+        for r in range(self.n):
+            if all((r, c) in self.marked for c in range(self.n)):
+                return True
+        # Columns
+        for c in range(self.n):
+            if all((r, c) in self.marked for r in range(self.n)):
+                return True
+        # Diagonals
+        if all((i, i) in self.marked for i in range(self.n)):
+            return True
+        if all((i, self.n - 1 - i) in self.marked for i in range(self.n)):
+            return True
+        return False

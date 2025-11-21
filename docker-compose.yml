@@ -1,27 +1,39 @@
 services:
-  leaderboard-api:
+  persistence:
     build:
-      context: .
-      target: api
-    image: my-project-bingo-api:latest
+      context: ./persistence
+    image: my-project-bingo-persistence:latest
     environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
       BINGO_DB_PATH: /app/data/bingo.db
     ports:
       - "8000:8000"
     volumes:
-      - bingo-data:/app/data
+      - ./persistence/data:/app/data
+    networks:
+      - bingo-network
 
-  bingo-streamlit:
+  bingo-game:
     build:
-      context: .
-      target: streamlit
-    image: my-project-bingo-streamlit:latest
+      context: ./game
+    image: my-project-bingo-game:latest
     environment:
-      BINGO_DB_PATH: /app/data/bingo.db
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      STREAMLIT_ADDRESS: 0.0.0.0
+      STREAMLIT_PORT: 8501
+      PERSISTENCE_URL: http://persistence:8000
+    depends_on:
+      - persistence
     ports:
       - "8501:8501"
-    volumes:
-      - bingo-data:/app/data
+    networks:
+      - bingo-network
 
-volumes:
-  bingo-data:
+networks:
+  bingo-network:
+    driver: bridge

@@ -6,43 +6,33 @@ with Docker Compose, and configure networking, volumes, and environment
 variables. Although the plan may evolve, documenting it in one place keeps the
 direction clear for future iterations.
 
-## 1. Container Build Strategy (Dockerfile)
-The Dockerfile defines a common **`base` stage** plus two distinct targets so we
-can produce separate API and Streamlit images without duplicating steps:
+## 1. Container Build Strategy (Dockerfiles)
+Each service ships with its own Dockerfile under its folder:
 
-1. **Base stage (`base`)** – starts from `python:3.12-slim`, sets `WORKDIR` to
-   `/app`, installs `uv`, copies `pyproject.toml`, `uv.lock`, `README.md`, and
-   `LICENSE.md`, then runs `uv sync --frozen --no-dev --no-install-project` to
-   create the runtime environment before copying `src/` and `main.py`.
-2. **API stage (`api`)** – `FROM base AS api`, `EXPOSE 8000`, and `CMD ["uv",
-   "run", "uvicorn", "src.api.leaderboard:app", "--host", "0.0.0.0",
-   "--port", "8000"]`. This target bakes in the HTTP entry point.
-3. **Streamlit stage (`streamlit`)** – `FROM base AS streamlit`, `EXPOSE 8501`,
-   and `CMD ["uv", "run", "streamlit", "run", "src/ui/streamlit_app.py", ...]`
-   to publish the web UI.
+- **game/Dockerfile** – installs `uv`, syncs deps from `pyproject.toml` + `uv.lock`, copies `game/src`, and runs Streamlit on port 8501.
+- **persistence/Dockerfile** – installs `uv`, syncs deps from its `pyproject.toml` + `uv.lock`, copies `persistence/src`, and runs the FastAPI app on port 8000.
 
-Because the heavy lifting lives in the base stage, rebuilding either image reuses
-cached layers and guarantees identical dependency sets.
+Both images inherit from `python:3.12-slim`, set `PYTHONPATH=/app/src`, and use `uv sync --frozen --no-dev --no-install-project` during build to match the committed lockfiles.
 
 ## 2. Runtime Services (Docker Compose)
-Compose now builds **two images** from the single Dockerfile by selecting the
-appropriate target per service:
+Compose builds **two images**, each from its own Dockerfile:
 
-- **`leaderboard-api`**
-  - Purpose: exposes a FastAPI app (`src.api.leaderboard:app`) backed by the
-    same SQLite database for viewing stats via HTTP.
-  - Image: `my-project-bingo-api` (built with `target: api`) which already runs
-    `uv run uvicorn ... --port 8000`.
-  - Ports: binds container port `8000` to host `8000` for browser access.
-  - Environment: same `BINGO_DB_PATH` so records and API reads are consistent.
+- **`persistence`**
+  - Purpose: exposes a FastAPI app (`src.persistence.api:app`) backed by SQLite.
+  - Image: `my-project-bingo-persistence` (built from `persistence/Dockerfile`) which runs
+    `uvicorn ... --port 8000`.
+  - Ports: binds container port `8000` to host `8000` for browser access or
+    service-to-service communication.
+  - Environment: `BINGO_DB_PATH` so records and API reads are consistent.
 
-- **`bingo-streamlit`**
+- **`bingo-game`**
   - Purpose: publishes the Streamlit UI for playing/viewing bingo in the
-    browser.
-  - Image: `my-project-bingo-streamlit` (built with `target: streamlit`) which
-    runs `uv run streamlit run src/ui/streamlit_app.py`.
+    browser; talks to the persistence API over HTTP.
+  - Image: `my-project-bingo-game` (built from `game/Dockerfile`) which runs
+    `streamlit run src/ui/streamlit_app.py`.
   - Ports: binds container port `8501` to host `8501` for browser access.
-  - Environment: shares `BINGO_DB_PATH` so it reads/writes the same SQLite DB.
+  - Environment: `PERSISTENCE_URL` pointing to the persistence service (defaults
+    to `http://persistence:8000` in Compose).
 
 - **Future `tests` profile (optional)**
   - Could reuse the image to launch `uv run pytest`. Keeping this as a profile
@@ -73,13 +63,13 @@ Before rendering the workflow, we spell out each responsibility:
   final targets (`api`, `streamlit`) extend this base so we obtain separate
   runtime images without duplicating layers.
 - **API image** – inherits from the base stage, exposes port `8000`, and runs
-  `uv run uvicorn src.api.leaderboard:app --host 0.0.0.0 --port 8000`.
+  `uv run uvicorn src.persistence.api:app --host 0.0.0.0 --port 8000`.
 - **Streamlit image** – inherits from the same base, exposes `8501`, and runs
   the Streamlit UI.
-- **Compose services** – `leaderboard-api` runs Uvicorn exposing
-  `GET /leaderboard` and publishes `8000:8000`, while `bingo-streamlit`
-  publishes `8501:8501` for the browser. Future optional profiles (tests or
-  linting) would reuse the same pattern.
+- **Compose services** – `persistence` runs Uvicorn exposing
+  `GET /leaderboard` and `POST /results`, while `bingo-game`
+  publishes `8501:8501` and calls the persistence API via `PERSISTENCE_URL`.
+  Future optional profiles (tests or linting) would reuse the same pattern.
 - **Persistence** – named volume `bingo-data` mounted at `/app/data` stores the
   SQLite DB; every service points to it via `BINGO_DB_PATH`.
 - **Networking** – default bridge network gives internal connectivity; only the
@@ -87,7 +77,7 @@ Before rendering the workflow, we spell out each responsibility:
 
 ```
         +------------------+        +-----------------------+
-        |   bingo-streamlit |        |   leaderboard-api     |
+        |   bingo-game      |        |   persistence         |
         | (Streamlit UI)    |        | (FastAPI / Uvicorn)   |
         +---------+---------+        +-----------+-----------+
                   |                              |
@@ -114,21 +104,21 @@ flowchart TD
     A5 --> BaseStage
 
     subgraph Images["Final Docker Images"]
-        API_IMG["API image\n(target: api, cmd=uv run uvicorn..., EXPOSE 8000)"]
-        ST_IMG["Streamlit image\n(target: streamlit, cmd=uv run streamlit..., EXPOSE 8501)"]
+        API_IMG["API image\n(persistence/Dockerfile, EXPOSE 8000)"]
+        ST_IMG["Streamlit image\n(game/Dockerfile, EXPOSE 8501)"]
     end
     BaseStage --> API_IMG
     BaseStage --> ST_IMG
 
     subgraph Compose["Docker Compose Services"]
         direction LR
-        subgraph ST["bingo-streamlit container"]
+        subgraph ST["bingo-game container"]
             S1["Runs Streamlit image"]
             S2["Publishes 8501:8501"]
         end
-        subgraph API["leaderboard-api container"]
+        subgraph API["persistence container"]
             L1["Runs API image"]
-            L2["Exposes GET /leaderboard"]
+            L2["Exposes GET /leaderboard + POST /results"]
             L3["Publishes 8000:8000"]
         end
     end
@@ -138,7 +128,6 @@ flowchart TD
     subgraph Volume["bingo-data Volume"]
         V1["SQLite DB /app/data/bingo.db"]
     end
-    S1 -->|BINGO_DB_PATH| V1
     L1 -->|BINGO_DB_PATH| V1
 
     subgraph Network["Bridge Network"]
@@ -146,6 +135,7 @@ flowchart TD
     end
     ST <--> N1
     API <--> N1
+    S1 -->|HTTP (PERSISTENCE_URL)| API
     L3 -->|host port 8000| Host[(External clients)]
     S2 -->|host port 8501| Host
 

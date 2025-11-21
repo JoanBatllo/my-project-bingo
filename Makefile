@@ -1,41 +1,38 @@
-UV ?= uv
-UV_RUN ?= $(UV) run
-DOCKER ?= docker
-IMAGE ?= my-project-bingo
+COMPOSE ?= docker compose
 
-.PHONY: help install run streamlit test coverage clean docker-build docker-run
+.PHONY: help up down logs build test test-cov clean
 
 help:
-	@echo "Common targets:"
-	@echo "  install  - Install project dependencies with uv"
-	@echo "  run      - Launch the Streamlit Bingo UI (alias: streamlit)"
-	@echo "  streamlit- Launch the Streamlit Bingo UI"
-	@echo "  test     - Run the test suite"
-	@echo "  coverage - Run tests with coverage details"
-	@echo "  clean    - Remove caches and coverage artifacts"
-	@echo "  docker-build - Build the Docker image"
-	@echo "  docker-run   - Run the Docker image"
+	@echo "Targets:"
+	@echo "  build          - Build game and persistence images"
+	@echo "  up             - Start persistence + game (Streamlit) containers"
+	@echo "  down           - Stop all containers"
+	@echo "  logs           - Tail compose logs"
+	@echo "  test           - Run pytest locally with game/persistence on PYTHONPATH"
+	@echo "  test-cov       - Run tests with coverage reporting"
+	@echo "  clean          - Remove caches and coverage artifacts"
 
-install:
-	$(UV) sync
+build:
+	$(COMPOSE) build
 
-run: streamlit
+up:
+	$(COMPOSE) up -d persistence bingo-game
+	@echo "Waiting for services to be ready..."
+	@sleep 3
+	@echo "Opening Streamlit UI in browser..."
+	@open http://localhost:8501 || xdg-open http://localhost:8501 || start http://localhost:8501 2>/dev/null || true
+	$(COMPOSE) logs -f bingo-game persistence
 
-streamlit:
-	$(UV_RUN) streamlit run src/ui/streamlit_app.py
+down:
+	$(COMPOSE) down
+
+logs:
+	$(COMPOSE) logs -f
+
 
 test:
-	$(UV_RUN) pytest
-
-coverage:
-	$(UV_RUN) pytest --cov=src --cov-report=term-missing
+	uv run pytest --cov=game/src --cov=game/clients --cov=game/ui --cov=persistence/src --cov-report=term-missing
 
 clean:
 	find . -name "__pycache__" -type d -prune -exec rm -rf {} +
-	rm -rf .pytest_cache .coverage
-
-docker-build:
-	$(DOCKER) build -t $(IMAGE) .
-
-docker-run: docker-build
-	$(DOCKER) run --rm -it $(IMAGE)
+	rm -rf .pytest_cache .coverage .coverage.*

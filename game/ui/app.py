@@ -7,19 +7,34 @@ from typing import Tuple
 
 import streamlit as st
 
-from src.game.bingo_card import BingoCard
-from src.game.number_drawer import NumberDrawer
-from src.game.win_checker import has_bingo
+from ..src.bingo_card import BingoCard
+from ..src.number_drawer import NumberDrawer
+from ..clients.persistence_client import PersistenceClient
 
 
 DEFAULT_POOL_BY_SIZE = {3: 30, 4: 60, 5: 75}
 
 
 def _default_pool_max(board_size: int) -> int:
+    """Return the default pool maximum for a given board size.
+
+    Args:
+        board_size (int): Selected board dimension (N).
+
+    Returns:
+        int: Suggested maximum number for the draw pool.
+    """
     return DEFAULT_POOL_BY_SIZE.get(board_size, board_size * board_size)
 
 
 def _reset_game(board_size: int, pool_max: int, free_center: bool) -> None:
+    """Initialize session state for a new game.
+
+    Args:
+        board_size (int): The board dimension (N for an N×N grid).
+        pool_max (int): Maximum number available in the draw pool.
+        free_center (bool): Whether to enable a free center on odd boards.
+    """
     st.session_state.card = BingoCard(
         n=board_size,
         pool_max=pool_max,
@@ -28,14 +43,21 @@ def _reset_game(board_size: int, pool_max: int, free_center: bool) -> None:
     st.session_state.drawer = NumberDrawer(pool_max=pool_max)
     st.session_state.last_draw: int | None = None
     st.session_state.draw_history: list[int] = []
+    st.session_state.last_saved_result = None
     st.session_state.config = {
         "board_size": board_size,
         "pool_max": int(pool_max),
         "free_center": bool(free_center),
     }
+    st.session_state.player_name = st.session_state.get("player_name", "Anonymous")
 
 
 def _ensure_game() -> None:
+    """Ensure session state contains a card and drawer.
+
+    Returns:
+        None
+    """
     if "card" in st.session_state and "drawer" in st.session_state:
         return
     default_size = 5
@@ -43,6 +65,11 @@ def _ensure_game() -> None:
 
 
 def _draw_number() -> Tuple[int | None, bool]:
+    """Draw a number and auto-mark the card if present.
+
+    Returns:
+        Tuple[int | None, bool]: The drawn number (or None) and whether it was on the card.
+    """
     drawer: NumberDrawer = st.session_state.drawer
     card: BingoCard = st.session_state.card
     num = drawer.draw()
@@ -55,6 +82,11 @@ def _draw_number() -> Tuple[int | None, bool]:
 
 
 def _render_card() -> None:
+    """Render the bingo card with clickable cells.
+
+    Returns:
+        None
+    """
     card: BingoCard = st.session_state.card
     center = (card.n // 2, card.n // 2) if (card.n % 2 == 1 and card.free_center) else None
 
@@ -71,7 +103,39 @@ def _render_card() -> None:
                 st.session_state.card = card
 
 
+def _save_result(won: bool) -> None:
+    """Persist a game outcome to the leaderboard database.
+
+    Args:
+        won (bool): Whether the player won the game.
+    """
+    client = PersistenceClient()
+    card: BingoCard = st.session_state.card
+    player_name = (st.session_state.get("player_name") or "").strip() or "Anonymous"
+    draws_count = len(st.session_state.draw_history)
+    signature = (player_name, won, card.n, card.pool_max, draws_count)
+    if st.session_state.get("last_saved_result") == signature:
+        st.info("Result already saved.")
+        return
+
+    try:
+        client.record_result(
+            player_name=player_name,
+            board_size=card.n,
+            pool_max=card.pool_max,
+            won=won,
+            draws_count=draws_count,
+        )
+    except Exception as exc:  # noqa: BLE001 - surface to user
+        st.error(f"Could not save result via persistence service: {exc}")
+        return
+
+    st.session_state.last_saved_result = signature
+    st.success("Result saved to leaderboard.")
+
+
 def main() -> None:
+    """Entry point for the Streamlit Bingo UI."""
     st.set_page_config(
         page_title="Bingo Visualizer",
         page_icon="🎉",
@@ -108,6 +172,12 @@ def main() -> None:
             value=bool(current_config.get("free_center", False) and board_size % 2 == 1),
             disabled=board_size % 2 == 0,
         )
+        st.text_input(
+            "Player name",
+            key="player_name",
+            value=st.session_state.get("player_name", "Anonymous"),
+            help="Name saved to the leaderboard when recording results.",
+        )
         if st.button("New game / reset", use_container_width=True):
             _reset_game(board_size, pool_max, free_center)
             st.success("New card ready!")
@@ -118,7 +188,7 @@ def main() -> None:
     metrics[2].metric("Drawn so far", len(drawer.drawn))
     metrics[3].metric("Remaining in pool", drawer.remaining())
 
-    bingo_now = has_bingo(card.marked, card.n)
+    bingo_now = card.has_bingo
     if bingo_now:
         st.success("BINGO! You've completed a line. 🎉")
     else:
@@ -135,12 +205,40 @@ def main() -> None:
             st.write(f"Drew {num}. Not on your card.")
 
     if action_cols[1].button("Call Bingo", use_container_width=True):
-        if has_bingo(card.marked, card.n):
+        if card.has_bingo:
             st.success("BINGO! ✅")
         else:
             st.warning("Not yet. Keep going!")
 
+    save_cols = st.columns(2)
+    if save_cols[0].button("Save as win", use_container_width=True, disabled=not bingo_now):
+        _save_result(True)
+    if save_cols[1].button("Save as loss", use_container_width=True):
+        _save_result(False)
+
     _render_card()
+
+    st.subheader("Leaderboard")
+    client = PersistenceClient()
+    try:
+        leaderboard_rows = client.fetch_leaderboard(limit=10)
+    except Exception as exc:  # noqa: BLE001 - surface to user
+        st.error(f"Could not load leaderboard from persistence service: {exc}")
+        leaderboard_rows = []
+
+    if leaderboard_rows:
+        display_rows = [
+            {
+                "Player": row["name"],
+                "Games": row["games_played"],
+                "Wins": row["wins"],
+                "Win rate": f"{row['win_rate']*100:.1f}%",
+            }
+            for row in leaderboard_rows
+        ]
+        st.dataframe(display_rows, hide_index=True)
+    else:
+        st.write("No games recorded yet.")
 
     st.subheader("Draw history")
     if st.session_state.draw_history:

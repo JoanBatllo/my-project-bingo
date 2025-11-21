@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bingo-game"
+version = "0.1.0"
+description = "Streamlit-based Bingo game UI"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.40.0",
+    "requests>=2.32.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src", "clients", "ui"]

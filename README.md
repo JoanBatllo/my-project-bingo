@@ -13,38 +13,26 @@ This project is built following **Scrum methodology**, divided into sprints, wit
 - Automatic and manual marking of numbers
 - “Bingo!” validation (rows, columns, diagonals)
 - Streamlit UI with clickable cells, draw controls, and live status
+- SQLite-backed leaderboard exposed via a persistence service (record wins/losses and view standings in-app)
 - Unit and integration tests with `pytest`
 
 ## Project Structure
 
 └── my-project-bingo
-    ├── LICENSE.md
-    ├── README.md
-    ├── docs
-    │   └── architecture.md
-    ├── main.py
-    ├── pyproject.toml
-    ├── uv.lock
-    ├── src
-    │   ├── __init__.py
-    │   ├── game
-    │   │   ├── __init__.py
-    │   │   ├── bingo_card.py
-    │   │   ├── exceptions.py
-    │   │   ├── number_drawer.py
-    │   │   └── win_checker.py
-    │   └── ui
-    │       ├── __init__.py
-    │       └── streamlit_app.py
-    └── tests
-        ├── integration
-        │   ├── __init__.py
-        │   └── test_full_game_flow.py
-        └── unit
-            ├── __init__.py
-            ├── test_bingo_card.py
-            ├── test_number_drawer.py
-            └── test_win_checker.py
+    ├── game/               # Streamlit UI + game logic (game package)
+    │   ├── pyproject.toml  # runtime deps for the game container
+    │   ├── uv.lock
+    │   ├── Dockerfile
+    │   └── src/game/...    # bingo_card, number_drawer, leaderboard_client, ui/streamlit_app.py (win checks via BingoCard.has_bingo)
+    ├── persistence/        # FastAPI persistence/leaderboard service
+    │   ├── pyproject.toml
+    │   ├── uv.lock
+    │   ├── Dockerfile
+    │   └── src/persistence/...  # repository, api endpoints
+    ├── tests/              # unit + integration tests (import from game.* / persistence.*)
+    ├── docker-compose.yml  # runs persistence + game containers on a shared bridge
+    ├── Makefile            # common tasks (build, up, down, test)
+    └── docs/               # architecture and docker plan
 
 ## Installation & Setup
 
@@ -54,35 +42,16 @@ git clone https://github.com/JoanBatllo/my-project-bingo.git
 cd my-project-bingo
 ```
 
-### 2. Install dependencies with [uv](https://github.com/astral-sh/uv)
-```bash
-uv sync
-```
-
-`uv sync` will create `.venv/` for you and install both runtime and dev dependencies.
-
-### 3. Activate the environment (optional)
-```bash
-source .venv/bin/activate  # (Windows: .venv\Scripts\activate)
-```
-If you prefer not to activate the virtual environment, prefix commands with `uv run ...`.
-
 ## How to run the game
-```bash
-uv run streamlit run src/ui/streamlit_app.py
-```
-You can also use `make streamlit` or `make run`. The app launches at http://localhost:8501 with clickable cells, draw controls, and live bingo status.
+- Build and run via Docker Compose:
+  ```bash
+  docker compose build
+  docker compose up persistence bingo-game
+  ```
+  - Persistence API: http://localhost:8000
+  - Streamlit UI: http://localhost:8501 (talks to persistence at `http://persistence:8000` inside the network)
 
-### Run via Docker
-```bash
-make docker-build
-make docker-run
-```
-Streamlit via Docker Compose:
-```bash
-docker compose up bingo-streamlit
-```
-`docker-run` builds and starts the API container; `docker compose up bingo-streamlit` launches the Streamlit UI.
+- Local testing-only (no Docker): ensure `PYTHONPATH=game/src:persistence/src` then run `pytest`.
 
 ## How to Run Tests
 
@@ -90,24 +59,19 @@ All tests are written with **pytest**.
 
 ### Run all tests
 ```bash
-uv run pytest
+PYTHONPATH=game/src:persistence/src pytest
 ```
 
 ### Run tests with coverage
 ```bash
-uv run pytest --cov=src --cov-report=term-missing
+PYTHONPATH=game/src:persistence/src pytest --cov=game --cov=persistence --cov-report=term-missing
 ```
 
 ## Continuous Integration (GitHub Actions)
 
 This project includes a **CI workflow** that automatically runs all tests when pushing to `main`.
 
-The workflow:
-1. Sets up Python 3.12
-2. Installs dependencies
-3. Runs pytest with coverage
-
-Workflow file: `.github/workflows/tests.yml`
+The workflow (tests.yml) will need updates if you change paths; currently CI may not reflect the split containers.
 
 ## Technologies Used
 - **Python 3.12**
