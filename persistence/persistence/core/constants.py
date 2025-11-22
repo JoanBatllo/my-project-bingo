@@ -64,7 +64,7 @@ SELECT_LEADERBOARD = """
         COUNT(r.id) AS games_played,
         CASE
             WHEN COUNT(r.id) > 0
-            THEN ROUND(100.0 * COUNT(CASE WHEN r.won = 1 THEN 1 END) / COUNT(r.id), 1)
+            THEN CAST(COUNT(CASE WHEN r.won = 1 THEN 1 END) AS REAL) / COUNT(r.id)
             ELSE 0.0
         END AS win_rate
     FROM players p

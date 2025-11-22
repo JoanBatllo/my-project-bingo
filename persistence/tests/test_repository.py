@@ -261,13 +261,13 @@ class TestBingoRepositoryLeaderboard:
         assert leaderboard[0]["name"] == "PlayerA"
         assert leaderboard[0]["wins"] == 2
         assert leaderboard[0]["games_played"] == 2
-        assert leaderboard[0]["win_rate"] == 100.0
+        assert leaderboard[0]["win_rate"] == pytest.approx(1.0, abs=0.01)  # 100% as decimal
 
         # B second
         assert leaderboard[1]["name"] == "PlayerB"
         assert leaderboard[1]["wins"] == 1
         assert leaderboard[1]["games_played"] == 3
-        assert leaderboard[1]["win_rate"] == pytest.approx(33.3, abs=0.1)
+        assert leaderboard[1]["win_rate"] == pytest.approx(0.333, abs=0.01)  # 33.3% as decimal
 
         # C third
         assert leaderboard[2]["name"] == "PlayerC"

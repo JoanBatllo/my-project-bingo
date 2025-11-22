@@ -51,8 +51,8 @@ def _reset_game(board_size: int, pool_max: int, free_center: bool) -> None:
 def _ensure_game() -> None:
     """Ensure session state contains a card and drawer.
 
-    Returns:
-        None
+    Initializes a default game configuration if no game state exists.
+    Uses a 5×5 board with default pool size and no free center.
     """
     if "card" in st.session_state and "drawer" in st.session_state:
         return
@@ -78,10 +78,10 @@ def _draw_number() -> tuple[int | None, bool]:
 
 
 def _render_card() -> None:
-    """Render the bingo card with clickable cells.
+    """Render the bingo card as a display-only grid.
 
-    Returns:
-        None
+    Displays the bingo card grid with marked cells indicated by checkmarks.
+    The center cell shows "FREE" if free center is enabled for odd-sized boards.
     """
     card: BingoCard = st.session_state.card
     center = (card.n // 2, card.n // 2) if (card.n % 2 == 1 and card.free_center) else None
@@ -93,10 +93,7 @@ def _render_card() -> None:
             value = "FREE" if center == (r, c) else str(card.grid[r][c])
             marked = (r, c) in card.marked
             label = f"{'✅' if marked else '⬜️'} {value}"
-            button_kwargs = {"type": "primary"} if marked else {}
-            if cols[c].button(label, key=f"cell-{r}-{c}", use_container_width=True, **button_kwargs):
-                card.toggle_mark(r, c)
-                st.session_state.card = card
+            cols[c].write(label)
 
 
 def _save_result(won: bool) -> None:
@@ -128,23 +125,28 @@ def _save_result(won: bool) -> None:
         return
 
     st.session_state.last_saved_result = signature
+    st.session_state.leaderboard_cache = None
     st.success("Result saved to leaderboard.")
 
 
 def main() -> None:
-    """Entry point for the Streamlit Bingo UI."""
+    """Entry point for the Streamlit Bingo UI.
+
+    Sets up the page configuration, initializes game state, and renders
+    the complete user interface including game controls, bingo card,
+    leaderboard, and draw history.
+    """
     st.set_page_config(
         page_title="Bingo Visualizer",
         page_icon="🎉",
         layout="wide",
     )
-    # Initialize player_name before any widgets are created
     if "player_name" not in st.session_state:
         st.session_state.player_name = "Anonymous"
     _ensure_game()
 
     st.title("Bingo Visualizer")
-    st.caption("Draw numbers, mark hits, and watch for a winning line.")
+    st.caption("Draw numbers, auto-mark hits, and watch for a winning line.")
 
     card: BingoCard = st.session_state.card
     drawer: NumberDrawer = st.session_state.drawer
@@ -191,7 +193,7 @@ def main() -> None:
     if bingo_now:
         st.success("BINGO! You've completed a line. 🎉")
     else:
-        st.info("No bingo yet. Keep drawing or marking manually.")
+        st.info("No bingo yet. Keep drawing numbers.")
 
     action_cols = st.columns([2, 1])
     if action_cols[0].button("Draw next number", use_container_width=True):
@@ -218,12 +220,27 @@ def main() -> None:
     _render_card()
 
     st.subheader("Leaderboard")
-    client = PersistenceClient()
-    try:
-        leaderboard_rows = client.fetch_leaderboard(limit=10)
-    except Exception as exc:  # noqa: BLE001 - surface to user
-        st.error(f"Could not load leaderboard from persistence service: {exc}")
-        leaderboard_rows = []
+    if "leaderboard_cache" not in st.session_state or st.session_state.leaderboard_cache is None:
+        client = PersistenceClient()
+        try:
+            leaderboard_rows = client.fetch_leaderboard(limit=10)
+            st.session_state.leaderboard_cache = leaderboard_rows
+        except Exception as exc:  # noqa: BLE001 - surface to user
+            st.error(f"Could not load leaderboard from persistence service: {exc}")
+            st.session_state.leaderboard_cache = []
+            leaderboard_rows = []
+    else:
+        leaderboard_rows = st.session_state.leaderboard_cache
+
+    if st.button("Refresh leaderboard", use_container_width=False):
+        client = PersistenceClient()
+        try:
+            leaderboard_rows = client.fetch_leaderboard(limit=10)
+            st.session_state.leaderboard_cache = leaderboard_rows
+            st.success("Leaderboard refreshed!")
+        except Exception as exc:  # noqa: BLE001 - surface to user
+            st.error(f"Could not load leaderboard from persistence service: {exc}")
+            leaderboard_rows = st.session_state.leaderboard_cache
 
     if leaderboard_rows:
         display_rows = [
@@ -231,7 +248,7 @@ def main() -> None:
                 "Player": row["name"],
                 "Games": row["games_played"],
                 "Wins": row["wins"],
-                "Win rate": f"{row['win_rate']*100:.1f}%",
+                "Win rate": f"{float(row['win_rate']) * 100:.1f}%",
             }
             for row in leaderboard_rows
         ]
@@ -247,7 +264,5 @@ def main() -> None:
         st.write("No numbers drawn yet.")
 
 
-# Streamlit executes this file directly and will call main() automatically
-# We only call main() when actually running under Streamlit (not during imports)
 if __name__ == "__main__":
     main()
