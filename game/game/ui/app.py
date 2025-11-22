@@ -94,7 +94,12 @@ def _draw_number() -> tuple[int | None, dict[int, bool]]:
 
 
 def _render_card(card: BingoCard, title: str) -> None:
-    """Render a bingo card as a display-only grid."""
+    """Render a bingo card as a display-only grid.
+
+    Args:
+        card (BingoCard): Card to render.
+        title (str): Section title shown above the grid.
+    """
     center = (card.n // 2, card.n // 2) if (card.n % 2 == 1 and card.free_center) else None
 
     st.subheader(title)
@@ -108,7 +113,13 @@ def _render_card(card: BingoCard, title: str) -> None:
 
 
 def _save_result_for(player_name: str, card: BingoCard, won: bool) -> None:
-    """Persist a game outcome to the leaderboard database for a specific player."""
+    """Persist a game outcome to the leaderboard database for a specific player.
+
+    Args:
+        player_name (str): Name to record on the leaderboard.
+        card (BingoCard): Player's card used for the game.
+        won (bool): True if the player won; False otherwise.
+    """
     client = PersistenceClient()
     draws_count = len(st.session_state.draw_history)
     signature = (player_name, won, card.n, card.pool_max, draws_count)
@@ -135,7 +146,14 @@ def _save_result_for(player_name: str, card: BingoCard, won: bool) -> None:
 
 
 def _load_history(limit: int = ANALYTICS_HISTORY_LIMIT) -> list[dict]:
-    """Load recent game history rows from the persistence service."""
+    """Load recent game history rows from the persistence service.
+
+    Args:
+        limit (int): Maximum number of rows to fetch.
+
+    Returns:
+        list[dict]: History rows, newest first (may be empty on error).
+    """
     cached = st.session_state.get("history_cache")
     if cached is not None:
         return cached
@@ -152,7 +170,14 @@ def _load_history(limit: int = ANALYTICS_HISTORY_LIMIT) -> list[dict]:
 
 
 def _history_dataframe(history_rows: list[dict]) -> pd.DataFrame | None:
-    """Convert history rows to a cleaned dataframe."""
+    """Convert history rows to a cleaned dataframe.
+
+    Args:
+        history_rows (list[dict]): Raw history entries from the API.
+
+    Returns:
+        pd.DataFrame | None: Cleaned dataframe or None if no data.
+    """
     if not history_rows:
         return None
     df = pd.DataFrame(history_rows)
@@ -164,7 +189,14 @@ def _history_dataframe(history_rows: list[dict]) -> pd.DataFrame | None:
 
 
 def _compute_streaks(wins: pd.Series) -> tuple[int, int]:
-    """Compute longest win and loss streaks for a player's ordered results."""
+    """Compute longest win and loss streaks for a player's ordered results.
+
+    Args:
+        wins (pd.Series): Boolean/0-1 series ordered by played_at.
+
+    Returns:
+        tuple[int, int]: (longest_win_streak, longest_loss_streak).
+    """
     longest_win = longest_loss = 0
     current_win = current_loss = 0
     for won in wins:
@@ -180,7 +212,11 @@ def _compute_streaks(wins: pd.Series) -> tuple[int, int]:
 
 
 def _render_analytics_tab() -> None:
-    """Render the analytics dashboard."""
+    """Render the analytics dashboard.
+
+    Returns:
+        None
+    """
     st.subheader("Game insights")
     history_rows = _load_history()
     df = _history_dataframe(history_rows)
@@ -281,7 +317,11 @@ def _render_analytics_tab() -> None:
 
 
 def _record_multiplayer_results(winner_index: int) -> None:
-    """Save results for all players, marking only one winner."""
+    """Save results for all players, marking only one winner.
+
+    Args:
+        winner_index (int): Index of the winning player in session_state.cards.
+    """
     if st.session_state.get("winner_recorded"):
         return
     for idx, card in enumerate(st.session_state.cards):
@@ -291,7 +331,15 @@ def _record_multiplayer_results(winner_index: int) -> None:
 
 
 def _render_gameplay(cards: list[BingoCard], drawer: NumberDrawer) -> None:
-    """Render the main gameplay tab with single or multiplayer support."""
+    """Render the main gameplay tab with single or multiplayer support.
+
+    Args:
+        cards (list[BingoCard]): Active cards, one per player.
+        drawer (NumberDrawer): Shared number drawer for this session.
+
+    Returns:
+        None
+    """
     prev_multiplayer = st.session_state.get("multiplayer", False)
     with st.sidebar:
         st.header("Game setup")
