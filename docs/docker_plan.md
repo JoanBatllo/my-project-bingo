@@ -7,14 +7,16 @@ variables. Although the plan may evolve, documenting it in one place keeps the
 direction clear for future iterations.
 
 ## 1. Container Build Strategy (Dockerfiles)
+
 Each service ships with its own Dockerfile under its folder:
 
-- **game/Dockerfile** – installs `uv`, syncs deps from `pyproject.toml` + `uv.lock`, copies `game/src`, and runs Streamlit on port 8501.
-- **persistence/Dockerfile** – installs `uv`, syncs deps from its `pyproject.toml` + `uv.lock`, copies `persistence/src`, and runs the FastAPI app on port 8000.
+- **game/Dockerfile** – installs `uv`, syncs deps from `pyproject.toml` + `uv.lock`, copies the game package, and runs Streamlit on port 8501.
+- **persistence/Dockerfile** – installs `uv`, syncs deps from its `pyproject.toml` + `uv.lock`, copies the persistence package, and runs the FastAPI app on port 8000.
 
 Both images inherit from `python:3.12-slim`, set `PYTHONPATH=/app/src`, and use `uv sync --frozen --no-dev --no-install-project` during build to match the committed lockfiles.
 
 ## 2. Runtime Services (Docker Compose)
+
 Compose builds **two images**, each from its own Dockerfile:
 
 - **`persistence`**
@@ -29,10 +31,10 @@ Compose builds **two images**, each from its own Dockerfile:
   - Purpose: publishes the Streamlit UI for playing/viewing bingo in the
     browser; talks to the persistence API over HTTP.
   - Image: `my-project-bingo-game` (built from `game/Dockerfile`) which runs
-    `streamlit run src/ui/streamlit_app.py`.
+    `streamlit run game/ui/app.py`.
   - Ports: binds container port `8501` to host `8501` for browser access.
-  - Environment: `PERSISTENCE_URL` pointing to the persistence service (defaults
-    to `http://persistence:8000` in Compose).
+  - Environment: `PERSISTENCE_URL` pointing to the persistence service (set to
+    `http://persistence:8000` in Compose).
 
 - **Future `tests` profile (optional)**
   - Could reuse the image to launch `uv run pytest`. Keeping this as a profile
@@ -40,13 +42,14 @@ Compose builds **two images**, each from its own Dockerfile:
     developers can run the full suite inside Docker.
 
 ## 3. Networking, Volumes, and Environment
-- **Network Topology** – Compose’s default bridge network is sufficient. The two
-  services can talk internally if future features require it, while only the API
-  publishes a port to the host.
-- **Persistent Volume** – a named volume `bingo-data` is mounted at
-  `/app/data` in every service. SQLite stores `bingo.db` there so both
-  containers share the same persistence and data survives restarts. If we later
-  replace SQLite with another backend, the volume mount points are the only
+
+- **Network Topology** – A custom bridge network `bingo-network` connects the two
+  services. They can communicate internally using service names (e.g., `persistence:8000`),
+  while both services publish ports to the host for browser access.
+- **Persistent Volume** – A bind mount from `./persistence/data` to `/app/data` in the
+  persistence service. SQLite stores `bingo.db` there so data survives container restarts.
+  The volume is only mounted in the persistence service, not shared between containers.
+  If we later replace SQLite with another backend, the volume mount points are the only
   change needed in Compose.
 - **Environment Variables** – `BINGO_DB_PATH` standardizes how code discovers
   the database location. Additional knobs (e.g., logging levels, API limits)
@@ -56,59 +59,64 @@ Compose builds **two images**, each from its own Dockerfile:
   sync.
 
 ## 4. Detailed Deployment Topology
+
 Before rendering the workflow, we spell out each responsibility:
 
 - **Dockerfile pipeline** – base `python:3.12-slim`, install `uv`, copy
-  dependency manifests, run `uv sync --frozen`, copy application code. Two
-  final targets (`api`, `streamlit`) extend this base so we obtain separate
-  runtime images without duplicating layers.
-- **API image** – inherits from the base stage, exposes port `8000`, and runs
-  `uv run uvicorn src.persistence.api:app --host 0.0.0.0 --port 8000`.
-- **Streamlit image** – inherits from the same base, exposes `8501`, and runs
-  the Streamlit UI.
+  dependency manifests and application code, run `uv sync --no-dev`. Each service
+  has its own Dockerfile that builds a separate runtime image.
+- **API image** – built from `persistence/Dockerfile`, exposes port `8000`, and runs
+  `uv run uvicorn persistence.api.api:app --host 0.0.0.0 --port 8000`.
+- **Streamlit image** – built from `game/Dockerfile`, exposes `8501`, and runs
+  `streamlit run game/ui/app.py --server.address=0.0.0.0 --server.port=8501`.
 - **Compose services** – `persistence` runs Uvicorn exposing
   `GET /leaderboard` and `POST /results`, while `bingo-game`
   publishes `8501:8501` and calls the persistence API via `PERSISTENCE_URL`.
   Future optional profiles (tests or linting) would reuse the same pattern.
-- **Persistence** – named volume `bingo-data` mounted at `/app/data` stores the
-  SQLite DB; every service points to it via `BINGO_DB_PATH`.
-- **Networking** – default bridge network gives internal connectivity; only the
-  API maps a host port so browsers can reach it.
+- **Persistence** – bind mount from `./persistence/data` to `/app/data` stores the
+  SQLite DB; the persistence service uses `BINGO_DB_PATH` environment variable.
+- **Networking** – custom bridge network `bingo-network` provides internal connectivity;
+  both services map host ports so browsers can reach them.
 
 ```
         +------------------+        +-----------------------+
         |   bingo-game      |        |   persistence         |
         | (Streamlit UI)    |        | (FastAPI / Uvicorn)   |
+        | Port: 8501        |        | Port: 8000            |
         +---------+---------+        +-----------+-----------+
                   |                              |
-                  |   reads/writes games         |
+                  |   HTTP (PERSISTENCE_URL)    |
                   +--------------+---------------+
                                  |
-                         bingo-data volume
-                    (/app/data/bingo.db shared)
+                    bind mount: ./persistence/data
+                    (/app/data/bingo.db)
 ```
 
 ```mermaid
 flowchart TD
     %% Dockerfile build chain
-    subgraph Dockerfile["Dockerfile Build"]
-        A1["Base Image: python:3.12-slim"]
-        A2["Install uv tool"]
-        A3["Copy pyproject.toml + uv.lock"]
-        A4["Run uv sync --frozen"]
-        A5["Copy src/ + main.py"]
-        A1 --> A2 --> A3 --> A4 --> A5
+    subgraph GameDockerfile["Game Dockerfile"]
+        G1["Base Image: python:3.12-slim"]
+        G2["Install uv tool"]
+        G3["Copy game/ (pyproject.toml + code)"]
+        G4["Run uv sync --no-dev"]
+        G1 --> G2 --> G3 --> G4
     end
 
-    BaseStage["Shared base stage\n(uv deps + app code)"]
-    A5 --> BaseStage
+    subgraph PersistenceDockerfile["Persistence Dockerfile"]
+        P1["Base Image: python:3.12-slim"]
+        P2["Install uv tool"]
+        P3["Copy persistence/ (pyproject.toml + code)"]
+        P4["Run uv sync --no-dev"]
+        P1 --> P2 --> P3 --> P4
+    end
 
     subgraph Images["Final Docker Images"]
         API_IMG["API image\n(persistence/Dockerfile, EXPOSE 8000)"]
         ST_IMG["Streamlit image\n(game/Dockerfile, EXPOSE 8501)"]
     end
-    BaseStage --> API_IMG
-    BaseStage --> ST_IMG
+    P4 --> API_IMG
+    G4 --> ST_IMG
 
     subgraph Compose["Docker Compose Services"]
         direction LR
@@ -125,12 +133,14 @@ flowchart TD
     ST_IMG --> S1
     API_IMG --> L1
 
-    subgraph Volume["bingo-data Volume"]
-        V1["SQLite DB /app/data/bingo.db"]
+    subgraph Volume["Bind Mount"]
+        V1["SQLite DB ./persistence/data/bingo.db"]
+        V2["Mounted at /app/data"]
     end
-    L1 -->|BINGO_DB_PATH| V1
+    L1 -->|BINGO_DB_PATH| V2
+    V2 --> V1
 
-    subgraph Network["Bridge Network"]
+    subgraph Network["bingo-network (Bridge)"]
         N1["Internal service communication"]
     end
     ST <--> N1
@@ -163,6 +173,7 @@ flowchart TD
 ```
 
 ## 5. Next Steps
+
 - Prototype the FastAPI leaderboard endpoint locally to confirm the container
   boundaries satisfy the data-sharing requirements.
 - Decide whether the `tests` profile should become part of CI or stay manual.
