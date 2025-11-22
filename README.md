@@ -34,27 +34,62 @@ This project is built following **Scrum methodology**, divided into sprints, wit
 
 ```text
 └── my-project-bingo
-    ├── game/                    # Streamlit UI + game logic (game package)
-    │   ├── pyproject.toml       # runtime deps for the game container
-    │   ├── uv.lock
+    ├── Makefile
+    ├── docker-compose.yml
+    ├── pyproject.toml                 # root tooling/lint config
+    ├── uv.lock                        # root dependency lock
+    ├── docs/                          # documentation
+    │   ├── architecture.md
+    │   └── docker_plan.md
+    ├── game/                          # Streamlit UI + game logic (game package)
     │   ├── Dockerfile
-    │   ├── game/                # game package source code
-    │   │   ├── core/            # bingo_card, number_drawer (win checks via BingoCard.has_bingo)
-    │   │   ├── clients/         # persistence_client (HTTP client for persistence service)
-    │   │   └── ui/              # streamlit app.py (single + local multiplayer; analytics dashboard)
-    │   └── tests/               # unit tests for game package
-    ├── persistence/             # FastAPI persistence/leaderboard service
     │   ├── pyproject.toml
     │   ├── uv.lock
+    │   ├── game/
+    │   │   ├── __init__.py
+    │   │   ├── clients/
+    │   │   │   └── persistence_client.py
+    │   │   ├── core/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── bingo_card.py
+    │   │   │   └── number_drawer.py
+    │   │   └── ui/
+    │   │       └── app.py             # single + local multiplayer; analytics dashboard
+    │   ├── tests/
+    │   │   ├── test_app_utils.py
+    │   │   ├── test_bingo_card.py
+    │   │   ├── test_number_drawer.py
+    │   │   └── test_persistence_client.py
+    │   ├── htmlcov/                   # coverage HTML (generated)
+    │   └── .pytest_cache/             # pytest cache (generated)
+    ├── persistence/                   # FastAPI persistence/leaderboard service
     │   ├── Dockerfile
-    │   ├── persistence/         # persistence package source code
-    │   │   ├── core/            # repository, constants (includes migration/cleanup for played_at and zero-draw wins)
-    │   │   └── api/             # FastAPI endpoints + Pydantic models
-    │   └── tests/               # unit tests for persistence package
-    ├── tests-integration/       # integration tests (full game flow, repository flow, streamlit app)
-    ├── docker-compose.yml       # runs persistence + game containers on a shared bridge
-    ├── Makefile                 # common tasks (build, up, down, test, lint)
-    └── docs/                    # architecture and docker plan
+    │   ├── pyproject.toml
+    │   ├── uv.lock
+    │   ├── persistence/
+    │   │   ├── __init__.py
+    │   │   ├── api/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── api.py
+    │   │   │   └── models.py
+    │   │   └── core/
+    │   │       ├── __init__.py
+    │   │       ├── constants.py
+    │   │       └── repository.py
+    │   ├── tests/
+    │   │   ├── test_api.py
+    │   │   └── test_repository.py
+    │   ├── data/bingo.db              # runtime-generated db (volume in Docker)
+    │   ├── htmlcov/                   # coverage HTML (generated)
+    │   └── .pytest_cache/             # pytest cache (generated)
+    ├── tests-integration/
+    │   ├── __init__.py
+    │   ├── test_full_game_flow.py
+    │   ├── test_multiplayer_ui.py
+    │   ├── test_repository_flow.py
+    │   └── test_streamlit_app.py
+    ├── htmlcov/                       # root coverage HTML (generated)
+    └── .ruff_cache/                   # ruff cache (generated)
 ```
 
 ## Installation & Setup
