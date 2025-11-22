@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: help up down logs build rebuild test test-cov clean lint lint-fix
+.PHONY: help up down logs build rebuild test test-cov clean lint lint-fix test-integration
 
 help:
 	@echo "Targets:"
@@ -13,6 +13,7 @@ help:
 	@echo "  test-cov       - Run tests with coverage reporting"
 	@echo "  lint           - Run ruff linter on entire codebase"
 	@echo "  lint-fix       - Run ruff linter and auto-fix issues"
+	@echo "  test-integration - Run integration tests"
 	@echo "  clean          - Remove caches and coverage artifacts"
 
 build:
@@ -47,7 +48,10 @@ test-persistence:
 test-game:
 	cd game && uv run pytest
 
-test: test-persistence test-game
+test-integration:
+	uv run pytest tests-integration/
+
+test: test-persistence test-game test-integration
 
 
 lint:

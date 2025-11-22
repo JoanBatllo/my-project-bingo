@@ -28,8 +28,12 @@ def persistence_server(tmp_path):
 @pytest.fixture
 def streamlit_app():
     """Create a Streamlit AppTest instance."""
-    app_path = Path(__file__).resolve().parents[2] / "game" / "game" / "ui" / "app.py"
-    return AppTest.from_file(str(app_path))
+    # tests-integration/ is at project root, so go up 1 level to get project root
+    project_root = Path(__file__).resolve().parent.parent
+    app_path = project_root / "game" / "game" / "ui" / "app.py"
+    # Set PERSISTENCE_URL to avoid errors when app tries to create PersistenceClient
+    with patch.dict(os.environ, {"PERSISTENCE_URL": "http://localhost:8000"}):
+        return AppTest.from_file(str(app_path))
 
 
 def test_streamlit_app_initializes(streamlit_app):
@@ -105,7 +109,7 @@ def test_streamlit_app_integration_with_persistence(streamlit_app, persistence_s
     # Record some data via the API
     response = persistence_server.post(
         "/results",
-        params={
+        json={
             "player_name": "StreamlitTest",
             "board_size": 5,
             "pool_max": 75,

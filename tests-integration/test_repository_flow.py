@@ -1,4 +1,4 @@
-from persistence.repository import BingoRepository
+from persistence.core.repository import BingoRepository
 
 
 def test_record_and_leaderboard(tmp_path):
