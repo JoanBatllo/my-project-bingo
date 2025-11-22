@@ -98,6 +98,43 @@ class TestPersistenceClientLeaderboard:
             client.fetch_leaderboard()
 
 
+class TestPersistenceClientHistory:
+    """Tests for history fetching functionality."""
+
+    @pytest.fixture
+    def client(self):
+        """Create a PersistenceClient instance for testing."""
+        return PersistenceClient(base_url="http://localhost:8000")
+
+    @patch("game.clients.persistence_client.requests.get")
+    def test_fetch_history_success(self, mock_get, client):
+        """Test successful history fetch."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [{"id": 1, "name": "Alice"}]
+        mock_get.return_value = mock_response
+
+        result = client.fetch_history(limit=50)
+
+        assert result == [{"id": 1, "name": "Alice"}]
+        mock_get.assert_called_once_with(
+            "http://localhost:8000/history",
+            params={"limit": 50},
+            timeout=5,
+        )
+
+    @patch("game.clients.persistence_client.requests.get")
+    def test_fetch_history_error(self, mock_get, client):
+        """Test history fetch with error response."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.text = "Not Found"
+        mock_get.return_value = mock_response
+
+        with pytest.raises(RuntimeError, match="Failed to fetch history: 404"):
+            client.fetch_history()
+
+
 class TestPersistenceClientRecordResult:
     """Tests for result recording functionality."""
 

@@ -49,6 +49,23 @@ class PersistenceClient:
             raise RuntimeError(f"Failed to fetch leaderboard: {resp.status_code} {resp.text}")
         return resp.json()
 
+    def fetch_history(self, limit: int = 200) -> list[MutableMapping[str, object]]:
+        """Fetch recent game history rows for analytics.
+
+        Args:
+            limit: Maximum number of rows to retrieve (defaults to 200).
+
+        Returns:
+            List of recent game entries, newest first.
+
+        Raises:
+            RuntimeError: If the remote call fails.
+        """
+        resp = requests.get(f"{self.base_url}/history", params={"limit": limit}, timeout=self.timeout)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Failed to fetch history: {resp.status_code} {resp.text}")
+        return resp.json()
+
     def record_result(
         self,
         player_name: str,

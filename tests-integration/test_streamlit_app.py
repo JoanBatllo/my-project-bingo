@@ -6,6 +6,7 @@ running Streamlit application with real user interactions.
 """
 
 import os
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,13 +14,16 @@ import pytest
 from fastapi.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
-from persistence.api.api import app
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root / "persistence"))
 
 
 @pytest.fixture
 def persistence_server(tmp_path):
     """Start a test persistence server."""
     db_path = tmp_path / "test_bingo.db"
+    from persistence.api.api import app
+
     with patch.dict(os.environ, {"BINGO_DB_PATH": str(db_path)}):
         client = TestClient(app)
         yield client
@@ -41,9 +45,9 @@ def test_streamlit_app_initializes(streamlit_app):
     streamlit_app.run()
 
     # Verify app has initialized game state
-    assert "card" in streamlit_app.session_state
+    assert "cards" in streamlit_app.session_state
     assert "drawer" in streamlit_app.session_state
-    assert streamlit_app.session_state.card is not None
+    assert len(streamlit_app.session_state.cards) >= 1
     assert streamlit_app.session_state.drawer is not None
 
 
@@ -75,7 +79,7 @@ def test_streamlit_app_new_game_button(streamlit_app):
     streamlit_app.run()
 
     # Get initial card state
-    initial_card = streamlit_app.session_state.card
+    initial_card = streamlit_app.session_state.cards[0]
     initial_grid = [row[:] for row in initial_card.grid]
 
     # Find and click "New game / reset" button
@@ -89,7 +93,7 @@ def test_streamlit_app_new_game_button(streamlit_app):
         new_game_button.click().run()
 
         # Verify card was reset (should have different numbers)
-        new_card = streamlit_app.session_state.card
+        new_card = streamlit_app.session_state.cards[0]
         # Cards should be different (very unlikely to be identical)
         assert new_card.grid != initial_grid or len(streamlit_app.session_state.draw_history) == 0
 
@@ -128,4 +132,4 @@ def test_streamlit_app_integration_with_persistence(streamlit_app, persistence_s
 
     # Verify Streamlit app initializes
     streamlit_app.run()
-    assert "card" in streamlit_app.session_state
+    assert "cards" in streamlit_app.session_state

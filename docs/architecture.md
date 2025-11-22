@@ -27,11 +27,11 @@ This project implements a small, modular Bingo game with a Streamlit web UI. The
 - `game/game/clients/persistence_client.py`
   - Thin HTTP client that calls the persistence service (`PERSISTENCE_URL`) for fetching the leaderboard and recording game results. No direct imports of persistence code are used inside the game package.
 - `game/game/ui/app.py`
-  - Streamlit interface that wires user actions (draw numbers, call bingo, save results) to the game modules and renders the board as a display-only grid. Numbers are automatically marked when drawn if present on the card.
+  - Streamlit interface that wires user actions (draw numbers, call bingo, save results) to the game modules and renders display-only grids. Supports single-player and local multiplayer (two cards sharing one draw pile; first valid caller wins and both results are recorded). Analytics includes fastest-win with a guard that ignores wins with draws < board_size - 1.
 - `persistence/persistence/core/repository.py`
-  - SQLite repository containing all DB access, migrations, and leaderboard aggregation.
+  - SQLite repository containing all DB access, migrations, leaderboard aggregation, and cleanup of invalid legacy rows (e.g., zero-draw wins).
 - `persistence/persistence/api/api.py`
-  - FastAPI service exposing `/health`, `/leaderboard`, and `/results` endpoints backed by `BingoRepository`. Runs in its own container and is consumed over HTTP by the game/UI container.
+  - FastAPI service exposing `/health`, `/leaderboard`, `/history` (analytics), and `/results` endpoints backed by `BingoRepository`. Runs in its own container and is consumed over HTTP by the game/UI container. Pydantic models live in `persistence/api/models.py`.
 
 ### Data Model
 
@@ -39,6 +39,9 @@ This project implements a small, modular Bingo game with a Streamlit web UI. The
 - `BingoCard.marked: set[tuple[int,int]]` — coordinates marked as hit.
 - `NumberDrawer._pile: list[int]` — remaining numbers to draw.
 - `NumberDrawer.drawn: list[int]` — history of numbers drawn (for UI/status only).
+- `results.played_at: str` — UTC timestamp (SQLite datetime) when a game result was recorded, used by analytics/history.
+- `session_state.cards: list[BingoCard]` — one per active player (length 1 for single-player, 2 for multiplayer).
+- `session_state.player_names: list[str]` — names aligned to `cards`.
 
 ### Randomness & Reproducibility
 
@@ -101,6 +104,7 @@ persistence/
       constants.py
     api/
       api.py
+      models.py
   tests/
     test_repository.py
     test_api.py
@@ -108,6 +112,7 @@ tests-integration/
   test_full_game_flow.py
   test_repository_flow.py
   test_streamlit_app.py
+  test_multiplayer_ui.py
 ```
 
 ### Related Documentation

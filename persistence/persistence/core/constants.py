@@ -4,6 +4,7 @@
 # PRAGMA statements
 PRAGMA_FOREIGN_KEYS = "PRAGMA foreign_keys = ON"
 PRAGMA_JOURNAL_MODE_WAL = "PRAGMA journal_mode = WAL"
+PRAGMA_TABLE_INFO_RESULTS = "PRAGMA table_info(results)"
 
 # Schema creation statements
 CREATE_TABLE_PLAYERS = """
@@ -28,6 +29,7 @@ CREATE_TABLE_RESULTS = """
         game_id INTEGER NOT NULL,
         won INTEGER NOT NULL CHECK (won IN (0, 1)),
         draws_count INTEGER NOT NULL,
+        played_at TEXT NOT NULL DEFAULT (datetime('now')),
         FOREIGN KEY (player_id) REFERENCES players(id),
         FOREIGN KEY (game_id) REFERENCES games(id)
     )
@@ -54,7 +56,10 @@ INSERT_PLAYER = "INSERT INTO players (name) VALUES (?)"
 INSERT_GAME = "INSERT INTO games (board_size, pool_max) VALUES (?, ?)"
 
 # Result queries
-INSERT_RESULT = "INSERT INTO results (player_id, game_id, won, draws_count) VALUES (?, ?, ?, ?)"
+INSERT_RESULT = "INSERT INTO results (player_id, game_id, won, draws_count, played_at) VALUES (?, ?, ?, ?, datetime('now'))"
+DELETE_ZERO_DRAW_WINS = "DELETE FROM results WHERE won = 1 AND draws_count <= 0"
+ALTER_RESULTS_ADD_PLAYED_AT = "ALTER TABLE results ADD COLUMN played_at TEXT"
+BACKFILL_PLAYED_AT = "UPDATE results SET played_at = datetime('now') WHERE played_at IS NULL"
 
 # Leaderboard query
 SELECT_LEADERBOARD = """
@@ -72,6 +77,23 @@ SELECT_LEADERBOARD = """
     GROUP BY p.id, p.name
     HAVING COUNT(r.id) > 0
     ORDER BY wins DESC, games_played DESC
+    LIMIT ?
+"""
+
+# Recent game history query (newest first)
+SELECT_GAME_HISTORY = """
+    SELECT
+        r.id,
+        p.name,
+        g.board_size,
+        g.pool_max,
+        r.won,
+        r.draws_count,
+        COALESCE(r.played_at, datetime('now')) AS played_at
+    FROM results r
+    JOIN players p ON r.player_id = p.id
+    JOIN games g ON r.game_id = g.id
+    ORDER BY r.played_at DESC, r.id DESC
     LIMIT ?
 """
 

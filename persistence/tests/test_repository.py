@@ -383,3 +383,85 @@ class TestBingoRepositoryConstraints:
             )
 
         conn.close()
+
+
+class TestBingoRepositoryAnalytics:
+    """Tests for analytics-related helpers."""
+
+    def test_migrates_played_at_column(self, tmp_path: Path):
+        """Ensures legacy databases without played_at are migrated."""
+        db_path = tmp_path / "legacy.db"
+        conn = sqlite3.connect(str(db_path))
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)")
+        cur.execute(
+            "CREATE TABLE games (id INTEGER PRIMARY KEY AUTOINCREMENT, board_size INTEGER NOT NULL, pool_max INTEGER NOT NULL)"
+        )
+        cur.execute(
+            """
+            CREATE TABLE results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id INTEGER NOT NULL,
+                game_id INTEGER NOT NULL,
+                won INTEGER NOT NULL CHECK (won IN (0, 1)),
+                draws_count INTEGER NOT NULL,
+                FOREIGN KEY (player_id) REFERENCES players(id),
+                FOREIGN KEY (game_id) REFERENCES games(id)
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        repo = BingoRepository(str(db_path))
+        try:
+            conn = sqlite3.connect(str(db_path))
+            cur = conn.cursor()
+            cur.execute("PRAGMA table_info(results)")
+            columns = {row[1] for row in cur.fetchall()}
+            assert "played_at" in columns
+            conn.close()
+        finally:
+            repo.close()
+
+    def test_get_game_history(self, tmp_path: Path):
+        """Tests that get_game_history returns enriched rows ordered newest first."""
+        db_path = tmp_path / "history.db"
+        repo = BingoRepository(str(db_path))
+        try:
+            repo.record_game_result("HistA", board_size=3, pool_max=30, won=True, draws_count=5)
+            repo.record_game_result("HistB", board_size=4, pool_max=60, won=False, draws_count=9)
+
+            history = repo.get_game_history(limit=5)
+
+            assert len(history) == 2
+            assert history[0]["id"] >= history[1]["id"]
+            assert {"id", "name", "board_size", "pool_max", "won", "draws_count", "played_at"} <= history[0].keys()
+        finally:
+            repo.close()
+
+    def test_cleanup_invalid_zero_draw_wins(self, tmp_path: Path):
+        """Ensures legacy rows with zero draws and a win are removed on startup."""
+        db_path = tmp_path / "cleanup.db"
+        repo = BingoRepository(str(db_path))
+        repo.close()
+
+        # Inject an invalid row (won=1, draws_count=0)
+        conn = sqlite3.connect(str(db_path))
+        cur = conn.cursor()
+        cur.execute("INSERT INTO players (name) VALUES ('Cheater')")
+        cur.execute("INSERT INTO games (board_size, pool_max) VALUES (3, 30)")
+        cur.execute("INSERT INTO results (player_id, game_id, won, draws_count) VALUES (1, 1, 1, 0)")
+        conn.commit()
+        conn.close()
+
+        # Re-open repository to trigger cleanup
+        repo = BingoRepository(str(db_path))
+        try:
+            conn = sqlite3.connect(str(db_path))
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM results WHERE draws_count = 0 AND won = 1")
+            assert cur.fetchone()[0] == 0
+            conn.close()
+        finally:
+            repo.close()

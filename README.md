@@ -19,12 +19,16 @@ This project is built following **Scrum methodology**, divided into sprints, wit
 - Display-only bingo card with visual indicators for marked cells
 - Real-time game metrics (board size, last draw, drawn count, remaining pool)
 - Draw history tracking (shows recent draws)
+- Local multiplayer toggle: two players share the draw pool; first valid caller wins and both results are recorded automatically
 - SQLite-backed leaderboard exposed via a persistence service
 - Record game results (wins/losses) to the leaderboard
 - View leaderboard standings with player statistics (games played, wins, win rate)
+- Analytics dashboard with win-rate trendlines, draw efficiency, streaks, and fastest-win spotlight
 - Cached leaderboard API calls for better performance
 - Player name customization for leaderboard entries
 - Unit and integration tests with `pytest`
+- Analytics fastest-win spotlight ignores impossible wins (requires draws >= board_size - 1)
+- Persistence auto-cleans legacy invalid rows (zero-draw wins)
 
 ## Project Structure
 
@@ -37,15 +41,15 @@ This project is built following **Scrum methodology**, divided into sprints, wit
     │   ├── game/                # game package source code
     │   │   ├── core/            # bingo_card, number_drawer (win checks via BingoCard.has_bingo)
     │   │   ├── clients/         # persistence_client (HTTP client for persistence service)
-    │   │   └── ui/              # streamlit app.py
+    │   │   └── ui/              # streamlit app.py (single + local multiplayer; analytics dashboard)
     │   └── tests/               # unit tests for game package
     ├── persistence/             # FastAPI persistence/leaderboard service
     │   ├── pyproject.toml
     │   ├── uv.lock
     │   ├── Dockerfile
     │   ├── persistence/         # persistence package source code
-    │   │   ├── core/            # repository, constants
-    │   │   └── api/             # FastAPI endpoints
+    │   │   ├── core/            # repository, constants (includes migration/cleanup for played_at and zero-draw wins)
+    │   │   └── api/             # FastAPI endpoints + Pydantic models
     │   └── tests/               # unit tests for persistence package
     ├── tests-integration/       # integration tests (full game flow, repository flow, streamlit app)
     ├── docker-compose.yml       # runs persistence + game containers on a shared bridge
@@ -113,7 +117,8 @@ docker compose up persistence bingo-game
    - Select board size (3×3, 4×4, or 5×5)
    - Set the maximum number in the pool
    - Enable free center (for odd-sized boards only)
-   - Enter your player name (optional, defaults to "Anonymous")
+   - Choose single player or enable **Multiplayer mode** to add Player 2
+   - Enter player names (defaults to "Player 1"/"Player 2")
 
 2. **Start a new game**: Click "New game / reset" to generate a new bingo card
 
@@ -125,8 +130,8 @@ docker compose up persistence bingo-game
    - Click "Call Bingo" to verify your win
 
 5. **Save your result**:
-   - Click "Save as win" if you got Bingo (only enabled when Bingo is detected)
-   - Click "Save as loss" to record a game that didn't result in Bingo
+   - Single player: click "Save as win" (only enabled when Bingo is detected) or "Save as loss"
+   - Multiplayer: first valid caller auto-saves both players (winner + loser) to the leaderboard
 
 6. **View leaderboard**: The leaderboard shows player statistics including games played, wins, and win rate
    - Click "Refresh leaderboard" to update the standings

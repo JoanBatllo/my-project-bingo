@@ -7,17 +7,22 @@ import sqlite3
 from typing import Any
 
 from persistence.core.constants import (
+    ALTER_RESULTS_ADD_PLAYED_AT,
+    BACKFILL_PLAYED_AT,
     CREATE_INDEX_PLAYERS_NAME,
     CREATE_INDEX_RESULTS_GAME_ID,
     CREATE_INDEX_RESULTS_PLAYER_ID,
     CREATE_TABLE_GAMES,
     CREATE_TABLE_PLAYERS,
     CREATE_TABLE_RESULTS,
+    DELETE_ZERO_DRAW_WINS,
     INSERT_GAME,
     INSERT_PLAYER,
     INSERT_RESULT,
     PRAGMA_FOREIGN_KEYS,
     PRAGMA_JOURNAL_MODE_WAL,
+    PRAGMA_TABLE_INFO_RESULTS,
+    SELECT_GAME_HISTORY,
     SELECT_LEADERBOARD,
     SELECT_PLAYER_BY_NAME,
 )
@@ -69,6 +74,18 @@ class BingoRepository:
         cursor.execute(CREATE_INDEX_PLAYERS_NAME)
         cursor.execute(CREATE_INDEX_RESULTS_PLAYER_ID)
         cursor.execute(CREATE_INDEX_RESULTS_GAME_ID)
+
+        # Lightweight migration for analytics: ensure played_at exists on results
+        cursor.execute(PRAGMA_TABLE_INFO_RESULTS)
+        columns = {row[1] for row in cursor.fetchall()}
+        if "played_at" not in columns:
+            # SQLite disallows non-constant defaults in ALTER TABLE. Add column, then backfill.
+            cursor.execute(ALTER_RESULTS_ADD_PLAYED_AT)
+            cursor.execute(BACKFILL_PLAYED_AT)
+            # Future inserts will rely on the default in CREATE_TABLE_RESULTS; existing rows are backfilled.
+
+        # Cleanup: remove invalid wins with zero draws (buggy legacy rows)
+        cursor.execute(DELETE_ZERO_DRAW_WINS)
 
         self._conn.commit()
 
@@ -179,6 +196,39 @@ class BingoRepository:
                 "wins": row[1],
                 "games_played": row[2],
                 "win_rate": float(row[3]),
+            }
+            for row in rows
+        ]
+
+    def get_game_history(self, limit: int = 200) -> list[dict[str, Any]]:
+        """Return recent game history rows for analytics.
+
+        Args:
+            limit: Maximum number of rows to return (defaults to 200).
+
+        Returns:
+            List of dictionaries with player/game/result details ordered newest-first.
+        """
+        if self._conn is None:
+            raise RuntimeError("Repository connection is closed")
+
+        try:
+            limit_int = max(1, int(limit))
+        except (ValueError, TypeError):
+            limit_int = 200
+
+        cursor = self._conn.cursor()
+        cursor.execute(SELECT_GAME_HISTORY, (limit_int,))
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "name": row[1],
+                "board_size": row[2],
+                "pool_max": row[3],
+                "won": bool(row[4]),
+                "draws_count": row[5],
+                "played_at": row[6],
             }
             for row in rows
         ]

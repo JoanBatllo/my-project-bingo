@@ -110,3 +110,23 @@ class TestAPIEndpoints:
         leaderboard = response.json()
         assert len(leaderboard) > 0
         assert any(row["name"] == "Alice" for row in leaderboard)
+
+    def test_history_endpoint(self, test_client):
+        """Test the history endpoint returns recent games with required fields."""
+        test_client.post(
+            "/results",
+            json={
+                "player_name": "HistoryUser",
+                "board_size": 3,
+                "pool_max": 30,
+                "won": False,
+                "draws_count": 7,
+            },
+        )
+
+        response = test_client.get("/history?limit=5")
+        assert response.status_code == 200
+        payload = response.json()
+        assert isinstance(payload, list)
+        assert len(payload) >= 1
+        assert {"id", "name", "board_size", "pool_max", "won", "draws_count", "played_at"} <= payload[0].keys()

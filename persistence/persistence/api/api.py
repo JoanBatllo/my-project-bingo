@@ -7,16 +7,16 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
 
+from persistence.api.models import GameHistoryEntry, GameResultRequest, StatusResponse
 from persistence.core.repository import BingoRepository
 
 
 def _db_path() -> str:
-    """Get database path from environment or use default.
+    """Resolve the database path from environment or fall back to default.
 
     Returns:
-        Database file path, or ":memory:" if specified in env.
+        str: Absolute database file path, or ":memory:" when requested.
     """
     env_path = os.environ.get("BINGO_DB_PATH")
     if env_path:
@@ -30,38 +30,25 @@ def _db_path() -> str:
 
 app = FastAPI(title="Bingo Persistence API", version="0.1.0")
 
-
-class GameResultRequest(BaseModel):
-    """Request model for recording a game result."""
-
-    player_name: str = Field(..., description="Display name of the player")
-    board_size: int = Field(..., ge=3, description="Board dimension (N for N×N grid)")
-    pool_max: int = Field(..., ge=1, description="Maximum number in the draw pool")
-    won: bool = Field(..., description="Whether the player won")
-    draws_count: int = Field(..., ge=0, description="Number of draws taken")
-
-
-class StatusResponse(BaseModel):
-    """Response model for status endpoints."""
-
-    status: str
-
-
 @app.get("/health", response_model=StatusResponse)
 def health_check() -> StatusResponse:
-    """Health check endpoint."""
+    """Report service health.
+
+    Returns:
+        StatusResponse: Static ok status payload.
+    """
     return StatusResponse(status="ok")
 
 
 @app.get("/leaderboard")
 def get_leaderboard(limit: int = 10) -> list[dict]:
-    """Get leaderboard entries.
+    """Return leaderboard entries.
 
     Args:
-        limit: Maximum number of entries to return (default: 10).
+        limit (int): Maximum number of entries to return (default 10).
 
     Returns:
-        List of leaderboard entries with name, wins, games_played, and win_rate.
+        list[dict]: Rows with name, wins, games_played, and win_rate.
     """
     db_path = _db_path()
     repo = BingoRepository(db_path)
@@ -72,18 +59,36 @@ def get_leaderboard(limit: int = 10) -> list[dict]:
         repo.close()
 
 
+@app.get("/history", response_model=list[GameHistoryEntry])
+def get_history(limit: int = 200) -> list[dict]:
+    """Return recent game history rows for analytics.
+
+    Args:
+        limit (int): Maximum number of rows to return (default 200).
+
+    Returns:
+        list[dict]: History rows ordered newest first.
+    """
+    db_path = _db_path()
+    repo = BingoRepository(db_path)
+    try:
+        return repo.get_game_history(limit=limit)
+    finally:
+        repo.close()
+
+
 @app.post("/results", status_code=201, response_model=StatusResponse)
 def record_result(result: GameResultRequest) -> StatusResponse:
     """Record a game result.
 
     Args:
-        result: Game result data.
+        result (GameResultRequest): Game result data payload.
 
     Returns:
-        Status response indicating success.
+        StatusResponse: Success indicator.
 
     Raises:
-        HTTPException: If recording fails.
+        HTTPException: Raised when the result cannot be persisted.
     """
     db_path = _db_path()
     repo = BingoRepository(db_path)
