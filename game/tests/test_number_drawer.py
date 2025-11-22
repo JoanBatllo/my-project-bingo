@@ -3,7 +3,7 @@
 
 import pytest
 
-from game.src.number_drawer import NumberDrawer
+from game.core.number_drawer import NumberDrawer
 
 
 class TestNumberDrawerValidation:

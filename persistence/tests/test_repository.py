@@ -6,7 +6,17 @@ from pathlib import Path
 
 import pytest
 
-from persistence.src.repository import BingoRepository
+from persistence.core.constants import (
+    INSERT_GAME,
+    INSERT_RESULT,
+    PRAGMA_FOREIGN_KEYS,
+    SELECT_COUNT_GAMES,
+    SELECT_COUNT_RESULTS,
+    SELECT_GAME_FIELDS,
+    SELECT_PLAYER_BY_ID,
+    SELECT_RESULT_FIELDS,
+)
+from persistence.core.repository import BingoRepository
 
 
 class TestBingoRepositorySchema:
@@ -84,7 +94,7 @@ class TestBingoRepositoryPlayerManagement:
         db_path = tmp_path / "test.db"
         conn = sqlite3.connect(str(db_path))
         cur = conn.cursor()
-        cur.execute("SELECT name FROM players WHERE id = ?", (player_id,))
+        cur.execute(SELECT_PLAYER_BY_ID, (player_id,))
         row = cur.fetchone()
         assert row is not None and row[0] == "Alice"
         conn.close()
@@ -133,18 +143,18 @@ class TestBingoRepositoryGameResults:
         cur = conn.cursor()
 
         # Game exists
-        cur.execute("SELECT COUNT(*) FROM games")
+        cur.execute(SELECT_COUNT_GAMES)
         assert cur.fetchone()[0] == 1
 
-        cur.execute("SELECT board_size, pool_max FROM games")
+        cur.execute(SELECT_GAME_FIELDS)
         row = cur.fetchone()
         assert row == (5, 75)
 
         # Result exists
-        cur.execute("SELECT COUNT(*) FROM results")
+        cur.execute(SELECT_COUNT_RESULTS)
         assert cur.fetchone()[0] == 1
 
-        cur.execute("SELECT won, draws_count FROM results")
+        cur.execute(SELECT_RESULT_FIELDS)
         row = cur.fetchone()
         assert row[0] == 1
         assert row[1] == 12
@@ -166,10 +176,10 @@ class TestBingoRepositoryGameResults:
         conn = sqlite3.connect(str(db_path))
         cur = conn.cursor()
 
-        cur.execute("SELECT COUNT(*) FROM games")
+        cur.execute(SELECT_COUNT_GAMES)
         assert cur.fetchone()[0] == 3
 
-        cur.execute("SELECT COUNT(*) FROM results")
+        cur.execute(SELECT_COUNT_RESULTS)
         assert cur.fetchone()[0] == 3
 
         conn.close()
@@ -184,14 +194,13 @@ class TestBingoRepositoryGameResults:
             4. Verify that both game and result entries exist—indicating atomic commit.
         """
         # Create a valid player
-        player_id = repo._get_or_create_player("TestPlayer")
+        repo._get_or_create_player("TestPlayer")
 
         # Insert a game to get a valid game_id
         db_path = tmp_path / "test.db"
         conn = sqlite3.connect(str(db_path))
         cur = conn.cursor()
-        cur.execute("INSERT INTO games (board_size, pool_max) VALUES (?, ?)", (5, 75))
-        game_id = cur.lastrowid
+        cur.execute(INSERT_GAME, (5, 75))
         conn.commit()
         conn.close()
 
@@ -202,10 +211,10 @@ class TestBingoRepositoryGameResults:
         conn = sqlite3.connect(str(db_path))
         cur = conn.cursor()
 
-        cur.execute("SELECT COUNT(*) FROM games")
+        cur.execute(SELECT_COUNT_GAMES)
         assert cur.fetchone()[0] >= 1
 
-        cur.execute("SELECT COUNT(*) FROM results")
+        cur.execute(SELECT_COUNT_RESULTS)
         assert cur.fetchone()[0] >= 1
 
         conn.close()
@@ -337,12 +346,12 @@ class TestBingoRepositoryConstraints:
         db_path = tmp_path / "test.db"
         conn = sqlite3.connect(str(db_path))
         conn.isolation_level = None
-        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute(PRAGMA_FOREIGN_KEYS)
         cur = conn.cursor()
 
         with pytest.raises(sqlite3.IntegrityError):
             cur.execute(
-                "INSERT INTO results (player_id, game_id, won, draws_count) VALUES (?, ?, ?, ?)",
+                INSERT_RESULT,
                 (99999, 1, 1, 10),
             )
         conn.close()
@@ -358,18 +367,18 @@ class TestBingoRepositoryConstraints:
         db_path = tmp_path / "test.db"
         conn = sqlite3.connect(str(db_path))
         conn.isolation_level = None
-        conn.execute("PRAGMA foreign_keys = ON;")
+        conn.execute(PRAGMA_FOREIGN_KEYS)
         cur = conn.cursor()
 
         with pytest.raises(sqlite3.IntegrityError):
-            cur.execute("INSERT INTO games (board_size, pool_max) VALUES (?, ?)", (2, 10))
+            cur.execute(INSERT_GAME, (2, 10))
 
         with pytest.raises(sqlite3.IntegrityError):
-            cur.execute("INSERT INTO games (board_size, pool_max) VALUES (?, ?)", (5, 20))
+            cur.execute(INSERT_GAME, (5, 20))
 
         with pytest.raises(sqlite3.IntegrityError):
             cur.execute(
-                "INSERT INTO results (player_id, game_id, won, draws_count) VALUES (?, ?, ?, ?)",
+                INSERT_RESULT,
                 (1, 1, 2, 10),
             )
 

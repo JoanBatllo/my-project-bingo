@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List, MutableMapping
+from collections.abc import MutableMapping
 
 import requests
 
@@ -32,7 +32,7 @@ class PersistenceClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def fetch_leaderboard(self, limit: int = 10) -> List[MutableMapping[str, object]]:
+    def fetch_leaderboard(self, limit: int = 10) -> list[MutableMapping[str, object]]:
         """Fetch leaderboard rows from the persistence service.
 
         Args:
@@ -69,7 +69,7 @@ class PersistenceClient:
         Raises:
             RuntimeError: If the remote call fails.
         """
-        payload: Dict[str, object] = {
+        payload: dict[str, object] = {
             "player_name": player_name,
             "board_size": board_size,
             "pool_max": pool_max,

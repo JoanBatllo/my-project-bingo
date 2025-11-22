@@ -3,14 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 import streamlit as st
 
-from ..src.bingo_card import BingoCard
-from ..src.number_drawer import NumberDrawer
-from ..clients.persistence_client import PersistenceClient
-
+from game.clients.persistence_client import PersistenceClient
+from game.core.bingo_card import BingoCard
+from game.core.number_drawer import NumberDrawer
 
 DEFAULT_POOL_BY_SIZE = {3: 30, 4: 60, 5: 75}
 
@@ -49,7 +46,6 @@ def _reset_game(board_size: int, pool_max: int, free_center: bool) -> None:
         "pool_max": int(pool_max),
         "free_center": bool(free_center),
     }
-    st.session_state.player_name = st.session_state.get("player_name", "Anonymous")
 
 
 def _ensure_game() -> None:
@@ -64,7 +60,7 @@ def _ensure_game() -> None:
     _reset_game(default_size, _default_pool_max(default_size), free_center=False)
 
 
-def _draw_number() -> Tuple[int | None, bool]:
+def _draw_number() -> tuple[int | None, bool]:
     """Draw a number and auto-mark the card if present.
 
     Returns:
@@ -111,16 +107,17 @@ def _save_result(won: bool) -> None:
     """
     client = PersistenceClient()
     card: BingoCard = st.session_state.card
-    player_name = (st.session_state.get("player_name") or "").strip() or "Anonymous"
+    if "player_name" not in st.session_state:
+        st.session_state.player_name = "Anonymous"
     draws_count = len(st.session_state.draw_history)
-    signature = (player_name, won, card.n, card.pool_max, draws_count)
+    signature = (st.session_state.player_name, won, card.n, card.pool_max, draws_count)
     if st.session_state.get("last_saved_result") == signature:
         st.info("Result already saved.")
         return
 
     try:
         client.record_result(
-            player_name=player_name,
+            player_name=st.session_state.player_name,
             board_size=card.n,
             pool_max=card.pool_max,
             won=won,
@@ -141,6 +138,9 @@ def main() -> None:
         page_icon="🎉",
         layout="wide",
     )
+    # Initialize player_name before any widgets are created
+    if "player_name" not in st.session_state:
+        st.session_state.player_name = "Anonymous"
     _ensure_game()
 
     st.title("Bingo Visualizer")
@@ -175,7 +175,6 @@ def main() -> None:
         st.text_input(
             "Player name",
             key="player_name",
-            value=st.session_state.get("player_name", "Anonymous"),
             help="Name saved to the leaderboard when recording results.",
         )
         if st.button("New game / reset", use_container_width=True):
@@ -248,5 +247,7 @@ def main() -> None:
         st.write("No numbers drawn yet.")
 
 
+# Streamlit executes this file directly and will call main() automatically
+# We only call main() when actually running under Streamlit (not during imports)
 if __name__ == "__main__":
     main()

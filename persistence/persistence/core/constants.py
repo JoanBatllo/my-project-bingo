@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""SQL query constants for the Bingo repository."""
+
+# PRAGMA statements
+PRAGMA_FOREIGN_KEYS = "PRAGMA foreign_keys = ON"
+PRAGMA_JOURNAL_MODE_WAL = "PRAGMA journal_mode = WAL"
+
+# Schema creation statements
+CREATE_TABLE_PLAYERS = """
+    CREATE TABLE IF NOT EXISTS players (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE
+    )
+"""
+
+CREATE_TABLE_GAMES = """
+    CREATE TABLE IF NOT EXISTS games (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        board_size INTEGER NOT NULL CHECK (board_size >= 3),
+        pool_max INTEGER NOT NULL CHECK (pool_max >= board_size * board_size)
+    )
+"""
+
+CREATE_TABLE_RESULTS = """
+    CREATE TABLE IF NOT EXISTS results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER NOT NULL,
+        game_id INTEGER NOT NULL,
+        won INTEGER NOT NULL CHECK (won IN (0, 1)),
+        draws_count INTEGER NOT NULL,
+        FOREIGN KEY (player_id) REFERENCES players(id),
+        FOREIGN KEY (game_id) REFERENCES games(id)
+    )
+"""
+
+# Index creation statements
+CREATE_INDEX_PLAYERS_NAME = """
+    CREATE INDEX IF NOT EXISTS idx_players_name ON players(name)
+"""
+
+CREATE_INDEX_RESULTS_PLAYER_ID = """
+    CREATE INDEX IF NOT EXISTS idx_results_player_id ON results(player_id)
+"""
+
+CREATE_INDEX_RESULTS_GAME_ID = """
+    CREATE INDEX IF NOT EXISTS idx_results_game_id ON results(game_id)
+"""
+
+# Player queries
+SELECT_PLAYER_BY_NAME = "SELECT id FROM players WHERE name = ?"
+INSERT_PLAYER = "INSERT INTO players (name) VALUES (?)"
+
+# Game queries
+INSERT_GAME = "INSERT INTO games (board_size, pool_max) VALUES (?, ?)"
+
+# Result queries
+INSERT_RESULT = "INSERT INTO results (player_id, game_id, won, draws_count) VALUES (?, ?, ?, ?)"
+
+# Leaderboard query
+SELECT_LEADERBOARD = """
+    SELECT
+        p.name,
+        COUNT(CASE WHEN r.won = 1 THEN 1 END) AS wins,
+        COUNT(r.id) AS games_played,
+        CASE
+            WHEN COUNT(r.id) > 0
+            THEN ROUND(100.0 * COUNT(CASE WHEN r.won = 1 THEN 1 END) / COUNT(r.id), 1)
+            ELSE 0.0
+        END AS win_rate
+    FROM players p
+    LEFT JOIN results r ON p.id = r.player_id
+    GROUP BY p.id, p.name
+    HAVING COUNT(r.id) > 0
+    ORDER BY wins DESC, games_played DESC
+    LIMIT ?
+"""
+
+# Test/utility queries
+SELECT_PLAYER_BY_ID = "SELECT name FROM players WHERE id = ?"
+SELECT_COUNT_GAMES = "SELECT COUNT(*) FROM games"
+SELECT_COUNT_RESULTS = "SELECT COUNT(*) FROM results"
+SELECT_GAME_FIELDS = "SELECT board_size, pool_max FROM games"
+SELECT_RESULT_FIELDS = "SELECT won, draws_count FROM results"

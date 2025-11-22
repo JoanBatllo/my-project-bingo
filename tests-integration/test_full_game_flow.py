@@ -6,8 +6,8 @@ that the BingoCard, NumberDrawer, and win-checking logic work together
 correctly as an integrated system.
 """
 
-from game.src.bingo_card import BingoCard
-from game.src.number_drawer import NumberDrawer
+from game.core.bingo_card import BingoCard
+from game.core.number_drawer import NumberDrawer
 
 
 def test_full_game_flow_reaches_bingo():

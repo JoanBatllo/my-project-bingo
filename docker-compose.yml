@@ -2,6 +2,7 @@ services:
   persistence:
     build:
       context: ./persistence
+      dockerfile: Dockerfile
     image: my-project-bingo-persistence:latest
     environment:
       PYTHONUNBUFFERED: "1"
@@ -19,6 +20,7 @@ services:
   bingo-game:
     build:
       context: ./game
+      dockerfile: Dockerfile
     image: my-project-bingo-game:latest
     environment:
       PYTHONUNBUFFERED: "1"

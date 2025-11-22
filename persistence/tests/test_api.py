@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from persistence.src.api import app, _db_path
+from persistence.api.api import _db_path, app
 
 
 class TestDatabasePathConfiguration:
@@ -40,7 +40,7 @@ class TestAPIEndpoints:
     def test_client(self, tmp_path):
         """Create a test client with a temporary database."""
         db_path = tmp_path / "test.db"
-        with patch("persistence.src.api._db_path", return_value=str(db_path)):
+        with patch.dict(os.environ, {"BINGO_DB_PATH": str(db_path)}):
             yield TestClient(app)
 
     def test_health_endpoint(self, test_client):
@@ -66,7 +66,7 @@ class TestAPIEndpoints:
         # Test recording a win
         response = test_client.post(
             "/results",
-            params={
+            json={
                 "player_name": "Alice",
                 "board_size": 5,
                 "pool_max": 75,
@@ -80,7 +80,7 @@ class TestAPIEndpoints:
         # Test recording a loss
         response = test_client.post(
             "/results",
-            params={
+            json={
                 "player_name": "Bob",
                 "board_size": 3,
                 "pool_max": 30,
@@ -96,7 +96,7 @@ class TestAPIEndpoints:
         # Record a result
         test_client.post(
             "/results",
-            params={
+            json={
                 "player_name": "Alice",
                 "board_size": 5,
                 "pool_max": 75,

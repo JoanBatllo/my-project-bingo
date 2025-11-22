@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from game.src.bingo_card import BingoCard
+from game.core.bingo_card import BingoCard
 
 
 class TestBingoCardValidation:

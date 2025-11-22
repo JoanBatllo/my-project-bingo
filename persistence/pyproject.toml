@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bingo-persistence"
+name = "persistence"
 version = "0.1.0"
 description = "Persistence API for Bingo leaderboard using FastAPI and SQLite"
 requires-python = ">=3.10"
@@ -12,5 +12,38 @@ dependencies = [
     "uvicorn>=0.30.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff",
+    "mypy",
+]
+
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["persistence"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--cov=persistence",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+
+[tool.coverage.run]
+source = ["persistence"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

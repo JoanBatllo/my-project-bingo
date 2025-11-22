@@ -1,4 +1,5 @@
-from persistence.src.repository import BingoRepository
+from persistence.repository import BingoRepository
+
 
 def test_record_and_leaderboard(tmp_path):
     """Test recording game results and generating a leaderboard.

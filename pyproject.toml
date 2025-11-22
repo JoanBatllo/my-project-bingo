@@ -1,23 +1,43 @@
 [project]
-name = "my-project-bingo"
+name = 'bingo-dev'
 version = "0.1.0"
-description = "Bingo game project with persistence and UI services"
 requires-python = ">=3.10"
+
 dependencies = [
-    "streamlit>=1.51.0",
+    "pytest>=9.0.1",
+    "ruff>=0.1.0",
 ]
 
+[tool.uv.workspace]
+members = ["game", "persistence"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-q"
-
-[dependency-groups]
-dev = [
-    "httpx>=0.28.1",
-    "pytest>=8.0.0",
-    "pytest-cov>=4.0.0",
-    "fastapi>=0.115.0", # For TestClient in tests
-    "requests>=2.32.0", # For mocking HTTP requests in tests
+testpaths = ["tests"]
+addopts = [
+    "--tb=short",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+
+[tool.ruff.lint.isort]
+known-first-party = ["game", "persistence"]

@@ -1,4 +1,4 @@
-name: Run tests
+name: CI
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - main
 
 jobs:
-  pytest:
+  lint:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,6 +30,39 @@ jobs:
         run: |
           uv sync --dev
 
-      - name: Run pytest
+      - name: Run ruff
         run: |
-          uv run pytest --cov=game/src --cov=game/clients --cov=game/ui --cov=persistence/src --cov-report=term-missing
+          uv run ruff check game/ persistence/ tests-integration/
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Run game tests
+        run: |
+          cd game && uv run pytest
+
+      - name: Run persistence tests
+        run: |
+          cd persistence && uv run pytest
+
+      - name: Run integration tests
+        run: |
+          uv run pytest tests-integration/

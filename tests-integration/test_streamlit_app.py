@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 from streamlit.testing.v1 import AppTest
 
-from persistence.src.api import app as persistence_app
+from persistence.api.api import app
 
 
 @pytest.fixture
@@ -21,18 +21,15 @@ def persistence_server(tmp_path):
     """Start a test persistence server."""
     db_path = tmp_path / "test_bingo.db"
     with patch.dict(os.environ, {"BINGO_DB_PATH": str(db_path)}):
-        client = TestClient(persistence_app)
+        client = TestClient(app)
         yield client
 
 
 @pytest.fixture
 def streamlit_app():
     """Create a Streamlit AppTest instance."""
-    app_path = Path(__file__).parent.parent.parent / "game" / "ui" / "app.py"
-    content = app_path.read_text()
-    # Fix relative imports for AppTest
-    content = content.replace("from ..", "from game.")
-    return AppTest.from_string(content)
+    app_path = Path(__file__).resolve().parents[2] / "game" / "game" / "ui" / "app.py"
+    return AppTest.from_file(str(app_path))
 
 
 def test_streamlit_app_initializes(streamlit_app):

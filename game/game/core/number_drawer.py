@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import random
-from typing import List, Optional
+
 
 class NumberDrawer:
     """Manages a pool of numbers from 1 to ``pool_max`` and draws them without repetition.
@@ -9,7 +9,7 @@ class NumberDrawer:
     the pool at any time, and tracks both remaining and already drawn numbers.
     """
 
-    def __init__(self, pool_max: int, *, seed: Optional[int] = None):
+    def __init__(self, pool_max: int, *, seed: int | None = None):
         """Initialize a NumberDrawer instance.
 
         Args:
@@ -24,16 +24,16 @@ class NumberDrawer:
             raise ValueError("pool_max must be at least 1.")
 
         self.pool_max = pool_max
-        self._pile: List[int] = []
-        self.drawn: List[int] = []
+        self._pile: list[int] = []
+        self.drawn: list[int] = []
         self._rng = random.Random(seed)
         self._seed = seed
         self.reset()
 
-    def reset(self, *, seed: Optional[int] = None) -> None:
+    def reset(self, *, seed: int | None = None) -> None:
         """Reset the draw pile to its initial state.
 
-        This recreates the list from 1 to ``pool_max`` and shuffles it.  
+        This recreates the list from 1 to ``pool_max`` and shuffles it.
         If a seed is provided, the internal RNG is reseeded for deterministic behavior.
 
         Args:
@@ -47,7 +47,7 @@ class NumberDrawer:
         self._rng.shuffle(self._pile)
         self.drawn.clear()
 
-    def draw(self) -> Optional[int]:
+    def draw(self) -> int | None:
         """Draw the next number from the pool.
 
         Returns:

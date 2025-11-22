@@ -3,14 +3,51 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bingo-game"
+name = "game"
 version = "0.1.0"
-description = "Streamlit-based Bingo game UI"
+description = "Bingo game project UI services and logic"
 requires-python = ">=3.10"
+
 dependencies = [
-    "streamlit>=1.40.0",
+    "streamlit>=1.51.0",
+    "httpx>=0.28.1",
+    "pytest-cov>=4.0.0",
+    "fastapi>=0.115.0",
     "requests>=2.32.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff",
+    "mypy",
+]
+
 [tool.hatch.build.targets.wheel]
-packages = ["src", "clients", "ui"]
+packages = ["game"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--cov=game",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+
+[tool.coverage.run]
+source = ["game"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
