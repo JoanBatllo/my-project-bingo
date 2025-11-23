@@ -119,9 +119,28 @@ uv sync
 
 ## How to Run the Game
 
-### Using Docker Compose (Recommended)
+### Quick Start (Easiest - Double-Click to Run)
 
-The easiest way to run the application is using the provided Makefile commands:
+**macOS**: Simply double-click the `Run Bingo Game.command` file in the project root.
+
+**Linux**: Run `./run.sh` from the terminal, or make it executable and double-click if your file manager supports it.
+
+This will:
+
+1. ✅ Check if Docker is running
+2. ✅ Build and start all services automatically
+3. ✅ Wait for services to be ready
+4. ✅ Open your browser automatically to the game
+5. ✅ Show service logs in the terminal
+
+**Access the application:**
+
+- **Streamlit UI**: <http://localhost:8501> (opens automatically)
+- **Persistence API**: <http://localhost:8000>
+
+### Using Docker Compose (Alternative)
+
+You can also use the provided Makefile commands:
 
 > **Tip**: Run `make help` to see all available Makefile commands.
 
